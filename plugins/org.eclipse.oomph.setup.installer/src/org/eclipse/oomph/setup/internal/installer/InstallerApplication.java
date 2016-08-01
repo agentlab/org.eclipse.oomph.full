@@ -27,6 +27,7 @@ import org.eclipse.oomph.util.PropertiesUtil;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Platform;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.SubMonitor;
 import org.eclipse.equinox.app.IApplication;
 import org.eclipse.equinox.app.IApplicationContext;
@@ -66,6 +67,14 @@ public class InstallerApplication implements IApplication
     // This must come very early, before the first model is accessed, so that HTTPS can be authorized.
     IProvisioningAgent agent = P2Util.getCurrentProvisioningAgent();
     agent.registerService(UIServices.SERVICE_NAME, Installer.SERVICE_UI);
+
+    String[] args = Platform.getCommandLineArgs();
+
+    for (String arg : args)
+    {
+      // System.out.println("HHHHHAAAAA::: " + arg);
+      SetupInstallerPlugin.INSTANCE.log("HHHHHAAAAA::: " + arg, Status.INFO);
+    }
 
     Location location = Platform.getInstanceLocation();
     if (location != null)
