@@ -12,6 +12,8 @@
 256M
 -name
 Eclipse Installer
+-debug
+-consoleLog
 -data
 @noDefault
       </programArgs>
@@ -48,6 +50,24 @@ Eclipse Installer
 
    <features>
       <feature id="org.eclipse.oomph.setup.installer"/>
+      <feature id="org.eclipse.emf.ecore"/>
+      <feature id="org.eclipse.ecf.filetransfer.httpclient4.feature"/>
+      <feature id="org.eclipse.ecf.filetransfer.httpclient4.ssl.feature"/>
+      <feature id="org.eclipse.emf.common.ui"/>
+      <feature id="org.eclipse.emf.edit.ui"/>
+      <feature id="org.eclipse.ecf.core.feature"/>
+      <feature id="org.eclipse.emf.common"/>
+      <feature id="org.eclipse.rcp"/>
+      <feature id="org.eclipse.equinox.p2.core.feature"/>
+      <feature id="org.eclipse.ecf.filetransfer.feature"/>
+      <feature id="org.eclipse.ecf.core.ssl.feature"/>
+      <feature id="org.eclipse.ecf.filetransfer.ssl.feature"/>
+      <feature id="org.eclipse.emf.edit"/>
+      <feature id="org.eclipse.e4.rcp"/>
+      <feature id="org.eclipse.oomph.p2"/>
+      <feature id="org.eclipse.equinox.p2.extras.feature" version="1.2.200.v20160606-1311"/>
+      <feature id="org.eclipse.platform" version="4.6.0.v20160606-1342"/>
+      <feature id="org.eclipse.userstorage" version="1.0.0.v20160524-0709"/>
    </features>
 
    <configurations>
@@ -56,5 +76,12 @@ Eclipse Installer
       <plugin id="org.eclipse.equinox.ds" autoStart="true" startLevel="2" />
       <plugin id="org.eclipse.equinox.simpleconfigurator" autoStart="true" startLevel="1" />
    </configurations>
+
+   <preferencesInfo>
+      <targetfile overwrite="false"/>
+   </preferencesInfo>
+
+   <cssInfo>
+   </cssInfo>
 
 </product>
