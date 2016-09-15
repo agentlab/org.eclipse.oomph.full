@@ -94,4 +94,98 @@
       <category name="org.eclipse.oomph.others.category"/>
    </feature>
 
+
+   <!-- Setup Sources -->
+   <category-def name="org.eclipse.oomph.setup.src.category" label="Oomph Setup Sources"/>
+   <feature id="org.eclipse.oomph.setup.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.sdk.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.ui.ide.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.src.category"/>
+   </feature>
+
+   <!-- Setup Extensions Sources -->
+   <category-def name="org.eclipse.oomph.setup.extensions.src.category" label="Oomph Setup Extensions Sources"/>
+   <feature id="org.eclipse.oomph.setup.git.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.workingsets.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.projectset.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.targlets.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.maven.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.projects.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.mylyn.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.pde.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.jdt.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.setup.workbench.source" version="0.0.0">
+      <category name="org.eclipse.oomph.setup.extensions.src.category"/>
+   </feature>
+
+   <!-- Tools Sources -->
+   <category-def name="org.eclipse.oomph.tools.src.category" label="Oomph Tools Sources"/>
+   <feature id="org.eclipse.oomph.targlets.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.version.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.version.headless.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.ostools.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.workingsets.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.gitbash.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.launches.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.manifests.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.p2.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.preferences.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.projectconfig.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.projectcopy.source" version="0.0.0">
+      <category name="org.eclipse.oomph.tools.src.category"/>
+   </feature>
+
+   <!-- Others Sources -->
+   <category-def name="org.eclipse.oomph.others.src.category" label="Others Sources"/>
+   <feature id="org.eclipse.oomph.all.source" version="0.0.0">
+      <category name="org.eclipse.oomph.others.src.category"/>
+   </feature>
+   <feature id="org.eclipse.oomph.tests.source" version="0.0.0">
+      <category name="org.eclipse.oomph.others.src.category"/>
+   </feature>
+
 </site>
