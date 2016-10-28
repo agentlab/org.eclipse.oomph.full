@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -30,12 +30,9 @@ public final class SetupUtil
   public static final String INSTALLER_UPDATE_URL = PropertiesUtil.getProperty(SetupProperties.PROP_INSTALLER_UPDATE_URL, DEFAULT_INSTALLER_UPDATE_URL)
       .replace('\\', '/');
 
-  public static final String INSTALLER_PRODUCT_ID = "org.eclipse.oomph.setup.installer.product";
+  public static final boolean INSTALLER_APPLICATION = "org.eclipse.oomph.setup.installer.application".equals(PropertiesUtil.getApplicationID());
 
-  public static final boolean INSTALLER_PRODUCT = PropertiesUtil.getProperty("eclipse.product").equals(INSTALLER_PRODUCT_ID);
-
-  public static final boolean SETUP_ARCHIVER_APPLICATION = "org.eclipse.oomph.setup.core.SetupArchiver"
-      .equals(PropertiesUtil.getProperty("eclipse.application"));
+  public static final boolean SETUP_ARCHIVER_APPLICATION = "org.eclipse.oomph.setup.core.SetupArchiver".equals(PropertiesUtil.getApplicationID());
 
   private SetupUtil()
   {
@@ -49,13 +46,9 @@ public final class SetupUtil
     }
 
     Matcher matcher = StringExpander.STRING_EXPANSION_PATTERN.matcher(string);
-    if (!matcher.find())
-    {
-      return string;
-    }
 
     StringBuffer result = new StringBuffer();
-    do
+    while (matcher.find())
     {
       String group1 = matcher.group(1);
       if ("$".equals(group1))
@@ -66,7 +59,7 @@ public final class SetupUtil
       {
         matcher.appendReplacement(result, "\\$$0");
       }
-    } while (matcher.find());
+    }
 
     matcher.appendTail(result);
 

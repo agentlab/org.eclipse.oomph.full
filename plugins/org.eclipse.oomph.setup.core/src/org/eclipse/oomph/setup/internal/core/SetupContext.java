@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -24,7 +24,9 @@ import org.eclipse.oomph.setup.Stream;
 import org.eclipse.oomph.setup.User;
 import org.eclipse.oomph.setup.Workspace;
 import org.eclipse.oomph.setup.impl.InstallationTaskImpl;
+import org.eclipse.oomph.setup.internal.core.util.IndexManager;
 import org.eclipse.oomph.setup.internal.core.util.SetupCoreUtil;
+import org.eclipse.oomph.setup.internal.core.util.URIResolver;
 import org.eclipse.oomph.util.IORuntimeException;
 import org.eclipse.oomph.util.IOUtil;
 import org.eclipse.oomph.util.OS;
@@ -42,6 +44,7 @@ import org.eclipse.emf.ecore.plugin.EcorePlugin;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.URIConverter;
+import org.eclipse.emf.ecore.resource.URIHandler;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.emf.ecore.util.InternalEList;
 
@@ -80,13 +83,23 @@ public class SetupContext
   }
 
   /**
-   * Resolves a '{@link #USER_SCHEME user}' scheme URI to a 'file' scheme URI.
+   * Resolves using the appropriate URI handler's implementation.
+   * E.g., it resolves a '{@link #USER_SCHEME user}' scheme URI to a 'file' scheme URI.
    */
-  public static URI resolveUser(URI uri)
+  public static URI resolve(URI uri)
   {
-    if (isUserScheme(uri.scheme()))
+    for (URIHandler uriHandler : SetupCoreUtil.URI_CONVERTER.getURIHandlers())
     {
-      return SetupContext.GLOBAL_SETUPS_LOCATION_URI.appendSegments(uri.segments()).appendFragment(uri.fragment());
+      if (uriHandler.canHandle(uri))
+      {
+        if (uriHandler instanceof URIResolver)
+        {
+          URIResolver uriResolver = (URIResolver)uriHandler;
+          return uriResolver.resolve(uri);
+        }
+
+        break;
+      }
     }
 
     return uri;
@@ -119,9 +132,15 @@ public class SetupContext
 
   public static final URI SETUP_LOG_URI = CONFIGURATION_STATE_LOCATION_URI.appendSegment(LOG_FILE_NAME);
 
-  public static final URI INDEX_SETUP_URI = URI.createURI("index:/org.eclipse.setup");
+  public static final String INDEX_SETUP_NAME = "org.eclipse.setup";
 
-  public static final URI INDEX_SETUP_LOCATION_URI = URI.createURI("http://git.eclipse.org/c/oomph/org.eclipse.oomph.git/plain/setups/org.eclipse.setup");
+  public static final URI INDEX_ROOT_URI = URI.createURI("index:/");
+
+  public static final URI INDEX_SETUP_URI = INDEX_ROOT_URI.appendSegment(INDEX_SETUP_NAME);
+
+  public static final URI INDEX_ROOT_LOCATION_URI = URI.createURI("http://git.eclipse.org/c/oomph/org.eclipse.oomph.git/plain/setups/");
+
+  public static final URI INDEX_SETUP_LOCATION_URI = INDEX_ROOT_LOCATION_URI.trimSegments(1).appendSegment(INDEX_SETUP_NAME);
 
   public static final URI INDEX_SETUP_ARCHIVE_LOCATION_URI = URI.createURI("http://www.eclipse.org/setups/setups.zip");
 
@@ -218,6 +237,16 @@ public class SetupContext
 
   public static SetupContext createSelf(ResourceSet resourceSet)
   {
+    Resource indexResource = resourceSet.getResource(INDEX_SETUP_URI, false);
+    if (indexResource != null)
+    {
+      Index index = (Index)EcoreUtil.getObjectByType(indexResource.getContents(), SetupPackage.Literals.INDEX);
+      if (index != null)
+      {
+        new IndexManager().addIndex(index);
+      }
+    }
+
     Installation installation = getInstallation(resourceSet, true, Mode.CREATE_AND_SAVE);
     Workspace workspace = getWorkspace(resourceSet, true, Mode.CREATE_AND_SAVE);
 
@@ -284,11 +313,8 @@ public class SetupContext
 
   public static SetupContext create(Installation installation, Collection<? extends Stream> streams, User user)
   {
-    Workspace workspace = createWorkspace();
+    Workspace workspace = getWorkspace(installation.eResource().getResourceSet(), false, Mode.CREATE);
     workspace.getStreams().addAll(streams);
-    Resource workspaceResource = installation.eResource().getResourceSet().createResource(WORKSPACE_SETUP_FILE_NAME_URI);
-    workspaceResource.getContents().add(workspace);
-
     return new SetupContext(installation, workspace, user);
   }
 
@@ -602,7 +628,20 @@ public class SetupContext
 
       if (installationResource != null)
       {
-        installation = (Installation)installationResource.getContents().get(0);
+        EList<EObject> contents = installationResource.getContents();
+        if (contents.isEmpty())
+        {
+          // If it's not in the resource, and we're not going to create it and save it, then make sure it exists.
+          if (mode == Mode.NONE)
+          {
+            installation = createInstallation();
+            contents.add(installation);
+          }
+        }
+        else
+        {
+          installation = (Installation)contents.get(0);
+        }
       }
     }
 
@@ -680,7 +719,21 @@ public class SetupContext
 
       if (workspaceResource != null)
       {
-        workspace = (Workspace)workspaceResource.getContents().get(0);
+        EList<EObject> contents = workspaceResource.getContents();
+        if (contents.isEmpty())
+        {
+          // If it's not in the resource, and we're not going to create it and save it, then make sure it exists.
+          if (mode == Mode.NONE)
+          {
+            workspace = createWorkspace();
+            contents.add(workspace);
+          }
+
+        }
+        else
+        {
+          workspace = (Workspace)workspaceResource.getContents().get(0);
+        }
       }
     }
 

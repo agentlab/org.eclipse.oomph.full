@@ -38,6 +38,7 @@ import org.eclipse.oomph.setup.internal.core.util.ResourceMirror;
 import org.eclipse.oomph.setup.internal.core.util.SetupCoreUtil;
 import org.eclipse.oomph.setup.internal.sync.Synchronization;
 import org.eclipse.oomph.setup.p2.provider.SetupP2EditPlugin;
+import org.eclipse.oomph.setup.p2.util.P2TaskUISevices;
 import org.eclipse.oomph.setup.provider.SetupEditPlugin;
 import org.eclipse.oomph.setup.ui.recorder.RecorderManager;
 import org.eclipse.oomph.setup.ui.synchronizer.SynchronizerManager;
@@ -51,8 +52,11 @@ import org.eclipse.oomph.util.IOUtil;
 import org.eclipse.oomph.util.MonitorUtil;
 import org.eclipse.oomph.util.OS;
 import org.eclipse.oomph.util.PropertiesUtil;
+import org.eclipse.oomph.util.ReflectUtil;
+import org.eclipse.oomph.util.StringUtil;
 import org.eclipse.oomph.util.UserCallback;
 
+import org.eclipse.emf.common.CommonPlugin;
 import org.eclipse.emf.common.ui.EclipseUIPlugin;
 import org.eclipse.emf.common.util.EList;
 import org.eclipse.emf.common.util.ResourceLocator;
@@ -73,6 +77,11 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.equinox.p2.engine.IProfile;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.preference.PreferenceManager;
+import org.eclipse.jface.text.templates.ContextTypeRegistry;
+import org.eclipse.jface.text.templates.SimpleTemplateVariableResolver;
+import org.eclipse.jface.text.templates.TemplateContext;
+import org.eclipse.jface.text.templates.TemplateContextType;
+import org.eclipse.jface.text.templates.TemplateVariableResolver;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchWindow;
@@ -100,6 +109,8 @@ public final class SetupUIPlugin extends OomphUIPlugin
   public static final String PREF_HEADLESS = "headless.startup";
 
   public static final String PREF_SKIP_STARTUP_TASKS = "skip.startup.tasks";
+
+  public static final String PREF_P2_STARTUP_TASKS = "p2.startup.tasks";
 
   public static final String PREF_ENABLE_PREFERENCE_RECORDER = "enable.preference.recorder";
 
@@ -198,8 +209,9 @@ public final class SetupUIPlugin extends OomphUIPlugin
       {
         public void run()
         {
-          if (!SetupUtil.INSTALLER_PRODUCT)
+          if (!SetupUtil.INSTALLER_APPLICATION)
           {
+            initJDTTemplateVariables();
             SetupPropertyTester.setStarting(true);
 
             final IWorkbench workbench = PlatformUI.getWorkbench();
@@ -279,6 +291,66 @@ public final class SetupUIPlugin extends OomphUIPlugin
           }
         }
       });
+    }
+  }
+
+  private static void initJDTTemplateVariables()
+  {
+    // Modify the JDT's variable resolvers so that ${user} expands to a property author name,
+    // not simply to the System.getProperty("user.name") which is the account name and generally not appropriate as the author name.
+    try
+    {
+      boolean hasJDTUserName = !StringUtil.isEmpty(System.getProperty("jdt.user.name"));
+      Class<?> javaUIPluginClass = CommonPlugin.loadClass("org.eclipse.jdt.ui", "org.eclipse.jdt.internal.ui.JavaPlugin");
+      Object javaUIPlugin = ReflectUtil.invokeMethod("getDefault", javaUIPluginClass);
+      ContextTypeRegistry codeTemplateContextRegistry = ReflectUtil.invokeMethod("getCodeTemplateContextRegistry", javaUIPlugin);
+
+      for (@SuppressWarnings("unchecked")
+      Iterator<TemplateContextType> it = codeTemplateContextRegistry.contextTypes(); it.hasNext();)
+      {
+        TemplateContextType templateContextType = it.next();
+        for (@SuppressWarnings("unchecked")
+        Iterator<TemplateVariableResolver> it2 = templateContextType.resolvers(); it2.hasNext();)
+        {
+          TemplateVariableResolver templateVariableResolver = it2.next();
+          if ("user".equals(templateVariableResolver.getType()))
+          {
+            if (hasJDTUserName)
+            {
+              templateContextType.addResolver(new SimpleTemplateVariableResolver(templateVariableResolver.getType(), templateVariableResolver.getDescription())
+              {
+                @Override
+                protected String resolve(TemplateContext context)
+                {
+                  return PropertiesUtil.getProperty("jdt.user.name", PropertiesUtil.getProperty("user.name"));
+                }
+              });
+            }
+
+            templateContextType
+                .addResolver(new SimpleTemplateVariableResolver("location", "The user location as specified by the system property 'jdt.user.location'")
+                {
+                  @Override
+                  protected String resolve(TemplateContext context)
+                  {
+                    String result = PropertiesUtil.getProperty("jdt.user.location", "");
+                    if (!StringUtil.isEmpty(result) && !result.startsWith(" "))
+                    {
+                      result = " " + result;
+                    }
+
+                    return result;
+                  }
+                });
+
+            break;
+          }
+        }
+      }
+    }
+    catch (Exception ex)
+    {
+      // Ignore if anything goes wrong registering our variable resolvers.
     }
   }
 
@@ -601,6 +673,7 @@ public final class SetupUIPlugin extends OomphUIPlugin
       try
       {
         // At this point we know that no prompt was needed.
+        performer.put(P2TaskUISevices.class, new P2TaskUIServicesPrompter());
         EList<SetupTask> neededTasks = performer.initNeededSetupTasks(MonitorUtil.create(monitor, 2));
         if (restarting)
         {

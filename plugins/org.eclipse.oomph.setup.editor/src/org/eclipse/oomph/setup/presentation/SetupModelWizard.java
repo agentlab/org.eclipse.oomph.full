@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -913,6 +913,58 @@ public abstract class SetupModelWizard extends Wizard implements INewWizard
       templateUsagePage.addTemplate("Eclipse Project", "@EclipseProjectTemplate@.setup");
       templateUsagePage.addTemplate("Simple Project", "@SimpleProjectTemplate@.setup");
       templateUsagePage.addTemplate("Github Project", "@GithubProjectTemplate@.setup");
+    }
+  }
+
+  /**
+   * @author Ed Merks
+   */
+  public static class NewConfigurationWizard extends SetupModelWizard
+  {
+    @Override
+    protected void configureTemplateUsagePage(TemplateUsagePage templateUsagePage)
+    {
+      templateUsagePage.setTitle(SetupEditorPlugin.INSTANCE.getString("_UI_SetupModelWizard_label3"));
+      templateUsagePage.addTemplate("Simple Configuration", "@ConfigurationTemplate@.setup");
+    }
+  }
+
+  /**
+   * @author Ed Merks
+   */
+  public static class NewIndexWizard extends SetupModelWizard
+  {
+    @Override
+    protected void configureTemplateUsagePage(TemplateUsagePage templateUsagePage)
+    {
+      templateUsagePage.setTitle(SetupEditorPlugin.INSTANCE.getString("_UI_SetupModelWizard_label4"));
+      templateUsagePage.addTemplate("Simple Index", "@IndexTemplate@.setup");
+    }
+  }
+
+  /**
+   * @author Ed Merks
+   */
+  public static class NewProductCatalogWizard extends SetupModelWizard
+  {
+    @Override
+    protected void configureTemplateUsagePage(TemplateUsagePage templateUsagePage)
+    {
+      templateUsagePage.setTitle(SetupEditorPlugin.INSTANCE.getString("_UI_SetupModelWizard_label5"));
+      templateUsagePage.addTemplate("Simple Product Catalog", "@ProductCatalogTemplate@.setup");
+    }
+  }
+
+  /**
+   * @author Ed Merks
+   */
+  public static class NewProjectCatalogWizard extends SetupModelWizard
+  {
+    @Override
+    protected void configureTemplateUsagePage(TemplateUsagePage templateUsagePage)
+    {
+      templateUsagePage.setTitle(SetupEditorPlugin.INSTANCE.getString("_UI_SetupModelWizard_label6"));
+      templateUsagePage.addTemplate("Simple Project Catalog", "@ProjectCatalogTemplate@.setup");
     }
   }
 

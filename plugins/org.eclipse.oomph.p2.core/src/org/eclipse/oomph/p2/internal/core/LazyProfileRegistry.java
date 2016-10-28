@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -85,7 +85,7 @@ public class LazyProfileRegistry extends SimpleProfileRegistry
     this.provisioningAgent = provisioningAgent;
     this.store = store;
 
-    canWrite = LazyProfileRegistryComponent.OsgiHelper.canWrite(store);
+    canWrite = IOUtil.canWriteFolder(store);
 
     Field selfField = ReflectUtil.getField(SimpleProfileRegistry.class, "self");
     self = (String)ReflectUtil.getValue(selfField, this);

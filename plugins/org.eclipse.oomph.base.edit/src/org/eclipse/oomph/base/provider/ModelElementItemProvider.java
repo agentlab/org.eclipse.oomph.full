@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -15,6 +15,7 @@ import org.eclipse.oomph.base.BaseFactory;
 import org.eclipse.oomph.base.BasePackage;
 import org.eclipse.oomph.base.ModelElement;
 import org.eclipse.oomph.edit.BasePasteCommand;
+import org.eclipse.oomph.util.PropertiesUtil;
 
 import org.eclipse.emf.common.command.Command;
 import org.eclipse.emf.common.command.CommandWrapper;
@@ -35,6 +36,7 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.ecore.EStructuralFeature.Setting;
+import org.eclipse.emf.ecore.EcorePackage;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.impl.ResourceSetImpl;
@@ -46,6 +48,7 @@ import org.eclipse.emf.edit.command.SetCommand;
 import org.eclipse.emf.edit.domain.AdapterFactoryEditingDomain;
 import org.eclipse.emf.edit.domain.EditingDomain;
 import org.eclipse.emf.edit.provider.AdapterFactoryItemDelegator;
+import org.eclipse.emf.edit.provider.ComposeableAdapterFactory;
 import org.eclipse.emf.edit.provider.IChildCreationExtender;
 import org.eclipse.emf.edit.provider.IEditingDomainItemProvider;
 import org.eclipse.emf.edit.provider.IItemLabelProvider;
@@ -88,14 +91,35 @@ public class ModelElementItemProvider extends ItemProviderAdapter
    * This returns the property descriptors for the adapted class.
    * <!-- begin-user-doc -->
    * <!-- end-user-doc -->
-   * @generated
+   * @generated NOT
    */
   @Override
   public List<IItemPropertyDescriptor> getPropertyDescriptors(Object object)
   {
     if (itemPropertyDescriptors == null)
     {
-      super.getPropertyDescriptors(object);
+      itemPropertyDescriptors = new ArrayList<IItemPropertyDescriptor>()
+      {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean add(IItemPropertyDescriptor itemPropertyDescriptor)
+        {
+          int size = size();
+          if (size == 0)
+          {
+            super.add(itemPropertyDescriptor);
+          }
+          else
+          {
+            super.add(size - 1, itemPropertyDescriptor);
+          }
+
+          return true;
+        }
+      };
+
+      itemPropertyDescriptors.add(new EClassPropertyDescriptor(((ComposeableAdapterFactory)adapterFactory).getRootAdapterFactory(), getResourceLocator()));
 
     }
     return itemPropertyDescriptors;
@@ -836,6 +860,130 @@ public class ModelElementItemProvider extends ItemProviderAdapter
       }
 
       super.copyAttributeValue(eAttribute, eObject, value, setting);
+    }
+  }
+
+  /**
+   * @author Ed Merks
+   */
+  public static class EClassPropertyDescriptor implements IItemPropertyDescriptor
+  {
+    private static Object image;
+
+    private static final IItemLabelProvider LABEL_PROVIDER = new IItemLabelProvider()
+    {
+      public String getText(Object object)
+      {
+        EClass eClass = (EClass)object;
+        String instanceTypeName = eClass.getInstanceTypeName();
+        if (instanceTypeName != null)
+        {
+          return instanceTypeName;
+        }
+
+        return EcoreUtil.getURI(eClass).toString();
+      }
+
+      public Object getImage(Object object)
+      {
+        return image;
+      }
+    };
+
+    public EClassPropertyDescriptor(AdapterFactory adapterFactory, ResourceLocator resourceLocator)
+    {
+      if (image == null)
+      {
+        new AdapterFactoryItemDelegator(adapterFactory).getImage(EcorePackage.Literals.ECLASS);
+      }
+    }
+
+    public IItemLabelProvider getLabelProvider(Object object)
+    {
+      return LABEL_PROVIDER;
+    }
+
+    public Object getPropertyValue(Object object)
+    {
+      return ((EObject)object).eClass();
+    }
+
+    public boolean isPropertySet(Object object)
+    {
+      return true;
+    }
+
+    public boolean canSetProperty(Object object)
+    {
+      return false;
+    }
+
+    public void resetPropertyValue(Object object)
+    {
+    }
+
+    public void setPropertyValue(Object object, Object value)
+    {
+    }
+
+    public String getCategory(Object object)
+    {
+      return null;
+    }
+
+    public String getDescription(Object object)
+    {
+      return "The model class of this object";
+    }
+
+    public String getDisplayName(Object object)
+    {
+      return "Model Class";
+    }
+
+    public String[] getFilterFlags(Object object)
+    {
+      return PropertiesUtil.EXPERT_FILTER;
+    }
+
+    public Object getHelpContextIds(Object object)
+    {
+      return null;
+    }
+
+    public String getId(Object object)
+    {
+      return getDisplayName(object);
+    }
+
+    public boolean isCompatibleWith(Object object, Object anotherObject, IItemPropertyDescriptor anotherPropertyDescriptor)
+    {
+      return false;
+    }
+
+    public Object getFeature(Object object)
+    {
+      return "eClass";
+    }
+
+    public boolean isMany(Object object)
+    {
+      return false;
+    }
+
+    public Collection<?> getChoiceOfValues(Object object)
+    {
+      return Collections.emptyList();
+    }
+
+    public boolean isMultiLine(Object object)
+    {
+      return false;
+    }
+
+    public boolean isSortChoices(Object object)
+    {
+      return false;
     }
   }
 }

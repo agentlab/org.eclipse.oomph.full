@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2015, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,9 +11,9 @@
  */
 package org.eclipse.oomph.setup.internal.installer;
 
-import org.eclipse.oomph.setup.ui.AbstractSetupDialog;
 import org.eclipse.oomph.ui.MouseHandler;
 import org.eclipse.oomph.ui.UIUtil;
+import org.eclipse.oomph.util.PropertiesUtil;
 
 import org.eclipse.jface.layout.GridDataFactory;
 import org.eclipse.jface.window.Window;
@@ -56,7 +56,7 @@ public abstract class AbstractSimpleDialog extends Shell
     setLayout(verticalLayout);
     setSize(width, height);
     setImages(Window.getDefaultImages());
-    setText(AbstractSetupDialog.SHELL_TEXT);
+    setText(PropertiesUtil.getProductName());
 
     setBackground(SetupInstallerPlugin.getColor(207, 207, 207));
 

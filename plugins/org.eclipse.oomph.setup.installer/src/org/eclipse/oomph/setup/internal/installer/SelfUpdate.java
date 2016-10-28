@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -19,12 +19,12 @@ import org.eclipse.oomph.p2.internal.core.CachingRepositoryManager;
 import org.eclipse.oomph.setup.User;
 import org.eclipse.oomph.setup.internal.core.util.SetupCoreUtil;
 import org.eclipse.oomph.setup.ui.SelfCommitContext;
-import org.eclipse.oomph.setup.util.SetupUtil;
 import org.eclipse.oomph.ui.ErrorDialog;
 import org.eclipse.oomph.ui.UICallback;
 import org.eclipse.oomph.util.ExceptionHandler;
 import org.eclipse.oomph.util.IRunnable;
 import org.eclipse.oomph.util.OomphPlugin;
+import org.eclipse.oomph.util.PropertiesUtil;
 import org.eclipse.oomph.util.StringUtil;
 
 import org.eclipse.core.runtime.CoreException;
@@ -92,7 +92,7 @@ public class SelfUpdate
 
     String buildID = highestBuildID != 0 ? Integer.toString(highestBuildID) : firstBuildID;
 
-    for (IInstallableUnit iu : P2Util.asIterable(profile.query(QueryUtil.createIUQuery(SetupUtil.INSTALLER_PRODUCT_ID), null)))
+    for (IInstallableUnit iu : P2Util.asIterable(profile.query(QueryUtil.createIUQuery(PropertiesUtil.getProductID()), null)))
     {
       String label;
 

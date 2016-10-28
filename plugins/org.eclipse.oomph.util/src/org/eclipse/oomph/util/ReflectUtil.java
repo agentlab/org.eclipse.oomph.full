@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -109,11 +109,13 @@ public final class ReflectUtil
     }
   }
 
-  public static Object invokeMethod(Method method, Object target, Object... arguments)
+  public static <T> T invokeMethod(Method method, Object target, Object... arguments)
   {
     try
     {
-      return method.invoke(target, arguments);
+      @SuppressWarnings("unchecked")
+      T value = (T)method.invoke(target, arguments);
+      return value;
     }
     catch (RuntimeException ex)
     {
@@ -135,7 +137,7 @@ public final class ReflectUtil
     }
   }
 
-  public static Object invokeMethod(String methodName, Object target)
+  public static <T> T invokeMethod(String methodName, Object target)
   {
     if (target instanceof Class)
     {

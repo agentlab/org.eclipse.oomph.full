@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2015, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -49,10 +49,13 @@ public class LicensePrePrompter extends AbstractSetupDialog
 
   private Browser licenseBrowser;
 
+  private String shellText;
+
   public LicensePrePrompter(Shell parentShell, String license)
   {
     super(parentShell, DEFAULT_LICENSE_NAME, 700, 700, SetupUIPlugin.INSTANCE, false);
     this.license = license;
+    shellText = parentShell.getText();
   }
 
   @Override
@@ -164,5 +167,11 @@ public class LicensePrePrompter extends AbstractSetupDialog
     }
 
     return builder.toString();
+  }
+
+  @Override
+  protected String getShellText()
+  {
+    return shellText;
   }
 }

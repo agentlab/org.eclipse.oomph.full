@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -55,6 +55,7 @@ public class BaseResourceFactoryImpl extends ResourceFactoryImpl
     defaultLoadOptions.put(XMLResource.OPTION_EXTENDED_META_DATA, Boolean.TRUE);
     defaultLoadOptions.put(XMLResource.OPTION_LAX_FEATURE_PROCESSING, Boolean.TRUE);
     defaultLoadOptions.put(XMLResource.OPTION_DEFER_IDREF_RESOLUTION, Boolean.TRUE);
+    defaultLoadOptions.put(XMLResource.OPTION_USE_PACKAGE_NS_URI_AS_LOCATION, Boolean.FALSE);
 
     Map<Object, Object> defaultSaveOptions = result.getDefaultSaveOptions();
     defaultSaveOptions.put(XMLResource.OPTION_SKIP_ESCAPE_URI, Boolean.FALSE);

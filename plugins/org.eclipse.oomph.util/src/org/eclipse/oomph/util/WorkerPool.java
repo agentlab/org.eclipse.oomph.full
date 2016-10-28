@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2015, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -204,7 +205,7 @@ public abstract class WorkerPool<P extends WorkerPool<P, K, W>, K, W extends Wor
     {
       try
       {
-        latch.await();
+        await(-1L);
       }
       catch (InterruptedException ex)
       {
@@ -213,6 +214,17 @@ public abstract class WorkerPool<P extends WorkerPool<P, K, W>, K, W extends Wor
     }
 
     latch = null;
+  }
+
+  protected boolean await(long timeout) throws InterruptedException
+  {
+    if (timeout == -1L)
+    {
+      latch.await();
+      return true;
+    }
+
+    return latch.await(timeout, TimeUnit.MILLISECONDS);
   }
 
   /**

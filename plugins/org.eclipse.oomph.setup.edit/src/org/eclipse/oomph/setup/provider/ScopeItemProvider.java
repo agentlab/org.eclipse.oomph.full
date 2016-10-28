@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,7 @@ package org.eclipse.oomph.setup.provider;
 import org.eclipse.oomph.setup.Index;
 import org.eclipse.oomph.setup.Scope;
 import org.eclipse.oomph.setup.SetupPackage;
+import org.eclipse.oomph.util.StringUtil;
 
 import org.eclipse.emf.common.notify.AdapterFactory;
 import org.eclipse.emf.common.notify.Notification;
@@ -102,7 +103,7 @@ public class ScopeItemProvider extends SetupTaskContainerItemProvider
   {
     itemPropertyDescriptors.add(createItemPropertyDescriptor(((ComposeableAdapterFactory)adapterFactory).getRootAdapterFactory(), getResourceLocator(),
         getString("_UI_Scope_description_feature"), getString("_UI_PropertyDescriptor_description", "_UI_Scope_description_feature", "_UI_Scope_type"),
-        SetupPackage.Literals.SCOPE__DESCRIPTION, true, false, false, ItemPropertyDescriptor.GENERIC_VALUE_IMAGE, null, null));
+        SetupPackage.Literals.SCOPE__DESCRIPTION, true, true, false, ItemPropertyDescriptor.GENERIC_VALUE_IMAGE, null, null));
   }
 
   /**
@@ -146,9 +147,14 @@ public class ScopeItemProvider extends SetupTaskContainerItemProvider
   {
     Scope scope = (Scope)object;
     String label = scope.getLabel();
-    if (label == null || label.length() == 0)
+    if (StringUtil.isEmpty(label))
     {
       label = scope.getName();
+    }
+
+    if (StringUtil.isEmpty(label))
+    {
+      label = getTypeText(object);
     }
 
     return label;

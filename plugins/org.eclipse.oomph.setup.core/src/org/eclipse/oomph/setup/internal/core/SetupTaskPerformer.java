@@ -241,6 +241,8 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
 
   private boolean hasSuccessfullyPerformed;
 
+  private File logFile;
+
   public SetupTaskPerformer(URIConverter uriConverter, SetupPrompter prompter, Trigger trigger, SetupContext setupContext, Stream stream)
   {
     super(uriConverter, prompter, trigger, setupContext);
@@ -790,7 +792,7 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
           }
         }
 
-        expandVariableKeys(keys);
+        expandVariableKeys(keys, true);
 
         // 2.8. Expand task attributes in situ
         expandStrings(triggeredSetupTasks);
@@ -1307,6 +1309,11 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
     return new ExecutableInfo(this);
   }
 
+  public File getLogFile()
+  {
+    return logFile;
+  }
+
   public File getInstallationLocation()
   {
     for (SetupTask setupTask : triggeredSetupTasks)
@@ -1516,6 +1523,7 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
 
     addIndexRedirection(result, SetupContext.INDEX_SETUP_URI, "");
     addIndexRedirection(result, SetupContext.INDEX_SETUP_LOCATION_URI, ".location");
+    addIndexRedirection(result, SetupContext.INDEX_SETUP_ARCHIVE_LOCATION_URI, ".archive.location");
 
     if (REMOTE_DEBUG)
     {
@@ -1864,7 +1872,7 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
         File location = getProductConfigurationLocation();
         String path = SetupContext.OOMPH_NODE + "/" + SetupContext.LOG_FILE_NAME;
 
-        File logFile = new File(location, path);
+        logFile = new File(location, path);
         logFile.getParentFile().mkdirs();
 
         FileOutputStream out = new FileOutputStream(logFile, true);
@@ -1872,6 +1880,18 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
       }
       catch (FileNotFoundException ex)
       {
+        try
+        {
+          logFile = File.createTempFile("OomphSetup", ".log");
+          FileOutputStream out = new FileOutputStream(logFile, true);
+          logStream = new PrintStream(out);
+          return logStream;
+        }
+        catch (IOException ex1)
+        {
+          // Throw original exception.
+        }
+
         throw new RuntimeException(ex);
       }
     }
@@ -2398,7 +2418,7 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
       }
     }
 
-    expandVariableKeys(keys);
+    expandVariableKeys(keys, false);
 
     for (EStructuralFeature.Setting setting : unresolvedSettings)
     {
@@ -2463,7 +2483,7 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
     }
   }
 
-  private void expandVariableKeys(Set<String> keys)
+  private void expandVariableKeys(Set<String> keys, boolean addUnresolvedSettings)
   {
     Map<String, Set<String>> variables = new LinkedHashMap<String, Set<String>>();
     for (Map.Entry<Object, Object> entry : getMap().entrySet())
@@ -2502,7 +2522,17 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
         else if (entryKey instanceof String)
         {
           String value = entryValue.toString();
-          variables.put(key, getVariables(value));
+          Set<String> valueVariables = getVariables(value);
+          variables.put(key, valueVariables);
+
+          if (addUnresolvedSettings && !valueVariables.isEmpty())
+          {
+            VariableTask variable = allVariables.get(key);
+            if (variable != null)
+            {
+              unresolvedSettings.add(((InternalEObject)variable).eSetting(SetupPackage.Literals.VARIABLE_TASK__VALUE));
+            }
+          }
         }
       }
     }
@@ -3809,8 +3839,11 @@ public class SetupTaskPerformer extends AbstractSetupTaskContext
       {
         return null;
       }
+    }
 
-      for (SetupTaskPerformer setupTaskPerformer : performers)
+    for (SetupTaskPerformer setupTaskPerformer : performers)
+    {
+      if (!setupTaskPerformer.unresolvedSettings.isEmpty())
       {
         setupTaskPerformer.resolveSettings();
       }

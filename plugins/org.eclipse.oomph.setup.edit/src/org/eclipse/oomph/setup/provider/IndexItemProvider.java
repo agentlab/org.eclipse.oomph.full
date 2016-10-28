@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,12 +14,14 @@ import org.eclipse.oomph.base.provider.ModelElementItemProvider;
 import org.eclipse.oomph.setup.Index;
 import org.eclipse.oomph.setup.SetupFactory;
 import org.eclipse.oomph.setup.SetupPackage;
+import org.eclipse.oomph.util.StringUtil;
 
 import org.eclipse.emf.common.notify.AdapterFactory;
 import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.emf.edit.provider.ComposeableAdapterFactory;
 import org.eclipse.emf.edit.provider.IItemPropertyDescriptor;
+import org.eclipse.emf.edit.provider.ItemPropertyDescriptor;
 import org.eclipse.emf.edit.provider.ViewerNotification;
 
 import java.util.Collection;
@@ -57,9 +59,23 @@ public class IndexItemProvider extends ModelElementItemProvider
     {
       super.getPropertyDescriptors(object);
 
+      addNamePropertyDescriptor(object);
       addDiscoverablePackagesPropertyDescriptor(object);
     }
     return itemPropertyDescriptors;
+  }
+
+  /**
+   * This adds a property descriptor for the Name feature.
+   * <!-- begin-user-doc -->
+   * <!-- end-user-doc -->
+   * @generated
+   */
+  protected void addNamePropertyDescriptor(Object object)
+  {
+    itemPropertyDescriptors.add(createItemPropertyDescriptor(((ComposeableAdapterFactory)adapterFactory).getRootAdapterFactory(), getResourceLocator(),
+        getString("_UI_Index_name_feature"), getString("_UI_PropertyDescriptor_description", "_UI_Index_name_feature", "_UI_Index_type"),
+        SetupPackage.Literals.INDEX__NAME, true, false, false, ItemPropertyDescriptor.GENERIC_VALUE_IMAGE, null, null));
   }
 
   /**
@@ -142,7 +158,14 @@ public class IndexItemProvider extends ModelElementItemProvider
   @Override
   public String getText(Object object)
   {
-    return getString("_UI_Index_type");
+    Index index = (Index)object;
+    String label = index.getName();
+    if (StringUtil.isEmpty(label))
+    {
+      label = getTypeText(object);
+    }
+
+    return label;
   }
 
   /**
@@ -159,6 +182,9 @@ public class IndexItemProvider extends ModelElementItemProvider
 
     switch (notification.getFeatureID(Index.class))
     {
+      case SetupPackage.INDEX__NAME:
+        fireNotifyChanged(new ViewerNotification(notification, notification.getNotifier(), false, true));
+        return;
       case SetupPackage.INDEX__PRODUCT_CATALOGS:
       case SetupPackage.INDEX__PROJECT_CATALOGS:
         fireNotifyChanged(new ViewerNotification(notification, notification.getNotifier(), true, false));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,12 +12,19 @@ package org.eclipse.oomph.ui;
 
 import org.eclipse.oomph.internal.ui.UIPlugin;
 import org.eclipse.oomph.util.ReflectUtil;
+import org.eclipse.oomph.util.StringUtil;
+
+import org.eclipse.emf.edit.provider.IItemFontProvider;
+import org.eclipse.emf.edit.ui.provider.DiagnosticDecorator;
+import org.eclipse.emf.edit.ui.provider.ExtendedFontRegistry;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.jface.dialogs.ProgressMonitorDialog;
 import org.eclipse.jface.operation.IRunnableWithProgress;
+import org.eclipse.jface.resource.FontRegistry;
+import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
@@ -25,6 +32,9 @@ import org.eclipse.swt.SWTException;
 import org.eclipse.swt.browser.Browser;
 import org.eclipse.swt.custom.CCombo;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.FontMetrics;
+import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.PaletteData;
@@ -52,6 +62,8 @@ import javax.swing.text.html.parser.ParserDelegator;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author Eike Stepper
@@ -786,6 +798,367 @@ public final class UIUtil
     catch (IOException ex)
     {
       return html;
+    }
+  }
+
+  /**
+   * This returns HTML that can be rendered by styled text, which respects some HTML but not all of it well.
+   */
+  public static String getRenderableHTML(String html)
+  {
+    return stripHTMLFull(html, true);
+  }
+
+  private static String stripHTMLFull(String html, final boolean renderable)
+  {
+    try
+    {
+      final StringBuilder result = new StringBuilder();
+      new ParserDelegator().parse(new StringReader(html), new HTMLEditorKit.ParserCallback()
+      {
+        private StringBuilder builder = result;
+
+        private List<List<StringBuilder>> table;
+
+        private List<StringBuilder> row;
+
+        @Override
+        public void handleText(char[] text, int pos)
+        {
+          if (renderable)
+          {
+            builder.append(DiagnosticDecorator.escapeContent(new String(text)));
+          }
+          else
+          {
+            builder.append(text);
+          }
+        }
+
+        @Override
+        public void handleSimpleTag(Tag t, MutableAttributeSet a, int pos)
+        {
+          if ("img".equals(t.toString()))
+          {
+            builder.append("      ");
+          }
+          else if (t.breaksFlow())
+          {
+            if (renderable && builder == result)
+            {
+              builder.append("<br/>");
+            }
+
+            builder.append("\n");
+          }
+        }
+
+        @Override
+        public void handleStartTag(Tag t, MutableAttributeSet a, int pos)
+        {
+          String tagName = t.toString();
+          if ("table".equals(tagName))
+          {
+            table = new ArrayList<List<StringBuilder>>();
+          }
+          else if ("tr".equals(tagName))
+          {
+            row = new ArrayList<StringBuilder>();
+            table.add(row);
+          }
+          else if ("td".equals(tagName))
+          {
+            builder = new StringBuilder();
+            row.add(builder);
+          }
+          else if (tagName.startsWith("h") && tagName.length() > 1 && Character.isDigit(tagName.charAt(1)))
+          {
+            appendLineFeed(true);
+            appendLineFeed(false);
+            if (renderable)
+            {
+              builder.append("<b>");
+            }
+          }
+          else
+          {
+            if (t.breaksFlow())
+            {
+              appendLineFeed(true);
+            }
+          }
+        }
+
+        @Override
+        public void handleEndTag(Tag t, int pos)
+        {
+          String tagName = t.toString();
+          if ("table".equals(tagName))
+          {
+            int[] widths = null;
+            String[][][] tableEntries = new String[table.size()][][];
+
+            builder = result;
+
+            int rowIndex = 0;
+            for (List<StringBuilder> row : table)
+            {
+              if (widths == null)
+              {
+                widths = new int[row.size()];
+              }
+
+              String[][] tableRow = new String[row.size()][];
+              tableEntries[rowIndex] = tableRow;
+
+              int columnIndex = 0;
+              for (StringBuilder entry : row)
+              {
+                String value = StringUtil.trimRight(entry.toString());
+                String[] lines = value.split("\n");
+                tableRow[columnIndex] = lines;
+
+                for (String line : lines)
+                {
+                  widths[columnIndex] = Math.max(widths[columnIndex], line.length());
+                }
+
+                ++columnIndex;
+              }
+
+              ++rowIndex;
+            }
+
+            if (renderable)
+            {
+              builder.append("<pre>");
+            }
+
+            for (String[][] row : tableEntries)
+            {
+              int maxLines = 0;
+              for (String[] column : row)
+              {
+                maxLines = Math.max(maxLines, column.length);
+              }
+
+              if (renderable)
+              {
+                for (int i = 0; i < maxLines; ++i)
+                {
+                  int columnIndex = 0;
+                  for (String[] column : row)
+                  {
+                    String columnText = i < column.length ? column[i] : "";
+                    int columnWidth = widths[columnIndex];
+                    append(columnText, columnWidth);
+                    ++columnIndex;
+                  }
+                  builder.append("\n");
+                }
+              }
+              else
+              {
+                appendLineFeed(true);
+                for (int i = 0; i < maxLines; ++i)
+                {
+                  builder.append("|  ");
+                  int columnIndex = 0;
+                  for (String[] column : row)
+                  {
+                    append(i < column.length ? column[i] : "", widths[columnIndex]);
+                    builder.append(columnIndex == row.length - 1 ? "  |" : "  |  ");
+                    ++columnIndex;
+                  }
+
+                  appendLineFeed(false);
+                }
+              }
+            }
+
+            if (renderable)
+            {
+              builder.append("</pre>");
+
+            }
+
+            table = null;
+          }
+          else if ("tr".equals(tagName))
+          {
+          }
+          else if ("td".equals(tagName))
+          {
+          }
+          else if (tagName.startsWith("h") && tagName.length() > 1 && Character.isDigit(tagName.charAt(1)))
+          {
+            if (renderable)
+            {
+              builder.append("</b>");
+              appendLineFeed(true);
+            }
+          }
+          else
+          {
+            if (t.breaksFlow())
+            {
+              appendLineFeed(true);
+            }
+          }
+        }
+
+        private void append(String value, int width)
+        {
+          builder.append(value);
+
+          for (int i = value.length(); i < width; ++i)
+          {
+            builder.append(' ');
+          }
+        }
+
+        private void appendLineFeed(boolean conditional)
+        {
+          if (conditional)
+          {
+            int length = builder.length();
+            if (length == 0 || builder.charAt(length - 1) == '\n')
+            {
+              return;
+            }
+          }
+
+          if (renderable)
+          {
+            builder.append("<br/>");
+          }
+
+          builder.append('\n');
+        }
+
+      }, Boolean.TRUE);
+
+      return result.toString();
+    }
+    catch (IOException ex)
+    {
+      return html;
+    }
+  }
+
+  public static Point caclcuateSize(String html)
+  {
+    Shell shell = new Shell();
+    GC gc = new GC(shell);
+    FontRegistry fontRegistry = JFaceResources.getFontRegistry();
+    Font font = fontRegistry.get(fontRegistry.hasValueFor("org.eclipse.jdt.ui.javadocfont") ? "org.eclipse.jdt.ui.javadocfont" : JFaceResources.DIALOG_FONT);
+    Font fixedPitchFont = JFaceResources.getTextFont();
+
+    gc.setFont(font);
+    FontMetrics fontMetrics = gc.getFontMetrics();
+    int averageCharWidth = fontMetrics.getAverageCharWidth();
+
+    Font boldFont = ExtendedFontRegistry.INSTANCE.getFont(font, IItemFontProvider.BOLD_FONT);
+    gc.setFont(boldFont);
+
+    boolean browerAvailable = isBrowserAvailable();
+
+    String text = stripHTMLFull(html, false).trim();
+    String[] lines = text.split("\n");
+    int pixelWidth = 0;
+    for (String line : lines)
+    {
+      boolean isTableRow = line.startsWith("|");
+      if (!browerAvailable && isTableRow)
+      {
+        gc.setFont(fixedPitchFont);
+      }
+
+      int lineWidth = gc.textExtent(line).x;
+      if (browerAvailable && isTableRow)
+      {
+        lineWidth += 4 * averageCharWidth;
+      }
+
+      pixelWidth = Math.max(pixelWidth, lineWidth);
+      gc.setFont(font);
+    }
+
+    int numberOfAverageCharacters = pixelWidth / averageCharWidth + 2;
+
+    gc.dispose();
+    shell.dispose();
+
+    return new Point(numberOfAverageCharacters, lines.length);
+  }
+
+  /**
+   * This is a runnable for which {@link #schedule() schedule} can be called repeatedly.
+   * That will {@link UIUtil#timerExec(int, Runnable) timer execute} this runnable with the delay specified in the constructor,
+   * or, if the runnable has already been dispatched, will mark it for redispatching.
+   * As such, when {@link #run() run} is called, if schedule has been called in the meantime,
+   * the runnable will timer executed again,
+   * without calling {@link #perform() perform}.
+   * Otherwise, run will call perform to finally perform the delayed behavior.
+   * The {@link #prepareForDispatch() prepareForDispatch} method will be called immediate before any timer execute.
+   * In this default implementation is does nothing.
+   * If the control specified in the constructor is disposed when run is called, run will do nothing.
+   *
+   * @author Ed Merks
+   */
+  public static abstract class DelayedRunnable implements Runnable
+  {
+    final private Control control;
+
+    private int delay;
+
+    private boolean dispatched;
+
+    private boolean redispatch;
+
+    public DelayedRunnable(Control control, int milliseconds)
+    {
+      this.control = control;
+      delay = milliseconds;
+    }
+
+    protected abstract void perform();
+
+    protected void prepareForDispatch()
+    {
+    }
+
+    public void run()
+    {
+      if (!control.isDisposed())
+      {
+        dispatched = false;
+        if (redispatch)
+        {
+          schedule();
+        }
+        else
+        {
+          perform();
+        }
+      }
+    }
+
+    public void schedule()
+    {
+      if (dispatched)
+      {
+        redispatch = true;
+      }
+      else
+      {
+        prepareForDispatch();
+
+        dispatched = true;
+        redispatch = false;
+
+        UIUtil.timerExec(delay, this);
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,6 +9,9 @@
  *    Eike Stepper - initial API and implementation
  */
 package org.eclipse.oomph.util;
+
+import org.eclipse.core.runtime.IProduct;
+import org.eclipse.core.runtime.Platform;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -110,6 +113,47 @@ public final class PropertiesUtil
   public static String getTmpDir()
   {
     return getProperty("java.io.tmpdir", ".");
+  }
+
+  public static String getApplicationID()
+  {
+    String applicationID = getProperty("eclipse.application");
+    if (StringUtil.isEmpty(applicationID))
+    {
+      IProduct product = Platform.getProduct();
+      if (product != null)
+      {
+        applicationID = product.getApplication();
+      }
+    }
+
+    return applicationID;
+  }
+
+  public static String getProductID()
+  {
+    String productID = getProperty("eclipse.product");
+    if (StringUtil.isEmpty(productID))
+    {
+      IProduct product = Platform.getProduct();
+      if (product != null)
+      {
+        productID = product.getId();
+      }
+    }
+
+    return productID;
+  }
+
+  public static String getProductName()
+  {
+    IProduct product = Platform.getProduct();
+    if (product != null)
+    {
+      return product.getName();
+    }
+
+    return "Eclipse";
   }
 
   // public static void main(String[] args)

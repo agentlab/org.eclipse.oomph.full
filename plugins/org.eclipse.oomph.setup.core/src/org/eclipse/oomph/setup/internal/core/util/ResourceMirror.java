@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -74,10 +74,9 @@ public abstract class ResourceMirror extends WorkerPool<ResourceMirror, URI, Res
 
   public void begin(final IProgressMonitor monitor)
   {
-    final String taskName = resourceSet.getLoadOptions()
-        .get(ECFURIHandlerImpl.OPTION_CACHE_HANDLING) == ECFURIHandlerImpl.CacheHandling.CACHE_WITHOUT_ETAG_CHECKING ? "Loading from local cache "
-            : "Loading from internet ";
-    ResourceSet resourceSet = getResourceSet();
+    Map<Object, Object> loadOptions = resourceSet.getLoadOptions();
+    final String taskName = loadOptions.get(ECFURIHandlerImpl.OPTION_CACHE_HANDLING) == ECFURIHandlerImpl.CacheHandling.CACHE_WITHOUT_ETAG_CHECKING
+        ? "Loading from local cache " : "Loading from internet ";
     XMLResource.ResourceHandler resourceHandler = new BasicResourceHandler()
     {
       private int counter;
@@ -108,13 +107,15 @@ public abstract class ResourceMirror extends WorkerPool<ResourceMirror, URI, Res
       }
     };
 
-    Object oldResourceHandler = resourceSet.getLoadOptions().put(XMLResource.OPTION_RESOURCE_HANDLER, resourceHandler);
+    Object oldResourceHandler = loadOptions.put(XMLResource.OPTION_RESOURCE_HANDLER, resourceHandler);
+    loadOptions.put(ECFURIHandlerImpl.OPTION_MONITOR, monitor);
 
     monitor.beginTask(taskName, 50);
 
     begin(taskName, monitor);
 
-    resourceSet.getLoadOptions().put(XMLResource.OPTION_RESOURCE_HANDLER, oldResourceHandler);
+    loadOptions.put(XMLResource.OPTION_RESOURCE_HANDLER, oldResourceHandler);
+    loadOptions.remove(ECFURIHandlerImpl.OPTION_MONITOR);
   }
 
   protected void resolveProxies()

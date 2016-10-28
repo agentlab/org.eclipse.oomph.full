@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -12,6 +12,7 @@ package org.eclipse.oomph.setup.ui.actions;
 
 import org.eclipse.oomph.setup.SetupPackage;
 import org.eclipse.oomph.setup.SetupTask;
+import org.eclipse.oomph.setup.ui.SetupUIPlugin;
 
 import org.eclipse.emf.common.command.CompoundCommand;
 import org.eclipse.emf.edit.command.SetCommand;
@@ -79,6 +80,7 @@ public class ToggleDisabledAction implements IObjectActionDelegate
     }
 
     action.setEnabled(!tasks.isEmpty());
+    action.setImageDescriptor(SetupUIPlugin.INSTANCE.getImageDescriptor(disabled ? "checkbox_checked" : "checkbox_unchecked"));
     action.setChecked(disabled);
   }
 

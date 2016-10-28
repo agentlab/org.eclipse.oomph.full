@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2015, 2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -52,7 +52,7 @@ public final class KeepInstallerDialog extends AbstractSetupDialog
 
   public KeepInstallerDialog(Shell parentShell, boolean startPermanentInstaller)
   {
-    super(parentShell, SHELL_TEXT, 560, 270, SetupInstallerPlugin.INSTANCE, false);
+    super(parentShell, PropertiesUtil.getProductName(), 560, 270, SetupInstallerPlugin.INSTANCE, false);
     this.startPermanentInstaller = startPermanentInstaller;
   }
 
@@ -226,5 +226,11 @@ public final class KeepInstallerDialog extends AbstractSetupDialog
     }
 
     super.okPressed();
+  }
+
+  @Override
+  protected String getShellText()
+  {
+    return PropertiesUtil.getProductName();
   }
 }

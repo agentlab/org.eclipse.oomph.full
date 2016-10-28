@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -94,7 +94,7 @@ public final class QuestionnairePlugin extends OomphUIPlugin
               String path = PreferencesFactory.eINSTANCE.convertURI(entry.getKey());
               transaction.setPolicy(path, true);
 
-              if (!SetupUtil.INSTALLER_PRODUCT)
+              if (!SetupUtil.INSTALLER_APPLICATION)
               {
                 PreferenceProperty property = new PreferencesUtil.PreferenceProperty(path);
                 property.set(entry.getValue().getElement2());

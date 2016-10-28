@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 The Eclipse Foundation and others.
+ * Copyright (c) 2015, 2016 The Eclipse Foundation and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -60,6 +60,8 @@ public class SimpleMessageOverlay extends Shell implements ControlListener
 
   private boolean firstShown = true;
 
+  private Runnable closeAction;
+
   public SimpleMessageOverlay(SimpleInstallerDialog dialog, Type type, ControlRelocator controlRelocator, boolean dismissAutomatically)
   {
     this(dialog, type, controlRelocator, dismissAutomatically, null);
@@ -67,7 +69,14 @@ public class SimpleMessageOverlay extends Shell implements ControlListener
 
   public SimpleMessageOverlay(SimpleInstallerDialog dialog, Type type, ControlRelocator controlRelocator, boolean dismissAutomatically, final Runnable action)
   {
+    this(dialog, type, controlRelocator, dismissAutomatically, null, null);
+  }
+
+  public SimpleMessageOverlay(SimpleInstallerDialog dialog, Type type, ControlRelocator controlRelocator, boolean dismissAutomatically, final Runnable action,
+      final Runnable closeAction)
+  {
     super(dialog, SWT.NO_TRIM);
+    this.closeAction = closeAction;
 
     if (type == null)
     {
@@ -136,6 +145,10 @@ public class SimpleMessageOverlay extends Shell implements ControlListener
       public void widgetSelected(SelectionEvent e)
       {
         SimpleMessageOverlay.this.dialog.clearMessage();
+        if (closeAction != null)
+        {
+          closeAction.run();
+        }
       }
     });
 
@@ -158,6 +171,11 @@ public class SimpleMessageOverlay extends Shell implements ControlListener
   public Runnable getAction()
   {
     return action;
+  }
+
+  public Runnable getCloseAction()
+  {
+    return closeAction;
   }
 
   public Type getType()
@@ -313,11 +331,11 @@ public class SimpleMessageOverlay extends Shell implements ControlListener
   public static enum Type
   {
     ERROR(SetupInstallerPlugin.getColor(249, 54, 50), AbstractSimpleDialog.COLOR_WHITE, SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message.png"),
-        SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png")), SUCCESS(SetupInstallerPlugin.getColor(58, 195, 4),
-            AbstractSimpleDialog.COLOR_WHITE, SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message.png"),
-            SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png")), WARNING(SetupInstallerPlugin.getColor(240, 173, 78),
-                AbstractSimpleDialog.COLOR_WHITE, SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message.png"),
-                SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png"));
+        SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png")), //
+    SUCCESS(SetupInstallerPlugin.getColor(58, 195, 4), AbstractSimpleDialog.COLOR_WHITE, SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message.png"),
+        SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png")), //
+    WARNING(SetupInstallerPlugin.getColor(240, 173, 78), AbstractSimpleDialog.COLOR_WHITE,
+        SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message.png"), SetupInstallerPlugin.INSTANCE.getSWTImage("simple/close_message_hover.png"));
 
     public final Color backgroundColor;
 

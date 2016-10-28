@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,6 +17,7 @@ import org.eclipse.oomph.setup.internal.core.util.SetupCoreUtil;
 import org.eclipse.oomph.setup.ui.AbstractSetupDialog;
 import org.eclipse.oomph.setup.util.SetupUtil;
 import org.eclipse.oomph.util.OomphPlugin;
+import org.eclipse.oomph.util.PropertiesUtil;
 
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -224,5 +225,11 @@ public final class AboutDialog extends AbstractSetupDialog
     });
 
     createButton(parent, IDialogConstants.OK_ID, "Close", true);
+  }
+
+  @Override
+  protected String getShellText()
+  {
+    return PropertiesUtil.getProductName();
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -116,7 +116,7 @@ public final class RecorderManager
 
   private static final URI USER_URI = SetupContext.USER_SETUP_URI.appendFragment("/");
 
-  private static final URI USER_FILE_URI = SetupContext.resolveUser(SetupCoreUtil.createResourceSet().getURIConverter().normalize(SetupContext.USER_SETUP_URI));
+  private static final URI USER_FILE_URI = SetupContext.resolve(SetupCoreUtil.createResourceSet().getURIConverter().normalize(SetupContext.USER_SETUP_URI));
 
   private static final boolean SYNC_FOLDER_FIXED = PropertiesUtil.isProperty("oomph.setup.sync.folder.fixed");
 
@@ -934,7 +934,7 @@ public final class RecorderManager
 
     URI uri = resource.getURI();
     uri = uriConverter.normalize(uri);
-    uri = SetupContext.resolveUser(uri);
+    uri = SetupContext.resolve(uri);
     return uri;
   }
 

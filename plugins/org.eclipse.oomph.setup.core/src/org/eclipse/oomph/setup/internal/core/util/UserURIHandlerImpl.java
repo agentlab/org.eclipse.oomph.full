@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -30,6 +30,8 @@ import org.eclipse.emf.ecore.resource.URIConverter;
 import org.eclipse.emf.ecore.resource.impl.URIHandlerImpl;
 import org.eclipse.emf.ecore.util.EcoreUtil;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,7 +43,7 @@ import java.util.regex.Pattern;
 /**
  * @author Eike Stepper
  */
-public class UserURIHandlerImpl extends URIHandlerImpl
+public class UserURIHandlerImpl extends URIHandlerImpl implements URIResolver
 {
   private static final String FEATURE_PATTERN_SUFFIX = "='([^']*)'";
 
@@ -57,14 +59,26 @@ public class UserURIHandlerImpl extends URIHandlerImpl
     return SetupContext.isUserScheme(uri.scheme());
   }
 
+  public URI resolve(URI uri)
+  {
+    return SetupContext.GLOBAL_SETUPS_LOCATION_URI.appendSegments(uri.segments()).appendFragment(uri.fragment());
+  }
+
   @Override
   public InputStream createInputStream(URI uri, Map<?, ?> options) throws IOException
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     if (!uriConverter.exists(normalizedURI, options))
     {
-      create(uri, normalizedURI);
+      Resource resource = create(uri, normalizedURI);
+      if (resource != null && normalizedURI.lastSegment().equals("${setup.filename}"))
+      {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        resource.save(out, options);
+        out.close();
+        return new ByteArrayInputStream(out.toByteArray());
+      }
     }
 
     return uriConverter.createInputStream(normalizedURI, options);
@@ -73,7 +87,7 @@ public class UserURIHandlerImpl extends URIHandlerImpl
   @Override
   public OutputStream createOutputStream(URI uri, Map<?, ?> options) throws IOException
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     return uriConverter.createOutputStream(normalizedURI, options);
   }
@@ -81,7 +95,7 @@ public class UserURIHandlerImpl extends URIHandlerImpl
   @Override
   public void delete(URI uri, Map<?, ?> options) throws IOException
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     uriConverter.delete(normalizedURI, options);
   }
@@ -89,7 +103,7 @@ public class UserURIHandlerImpl extends URIHandlerImpl
   @Override
   public Map<String, ?> contentDescription(URI uri, Map<?, ?> options) throws IOException
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     if (!uriConverter.exists(normalizedURI, options))
     {
@@ -102,15 +116,15 @@ public class UserURIHandlerImpl extends URIHandlerImpl
   @Override
   public boolean exists(URI uri, Map<?, ?> options)
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
-    return uriConverter.exists(normalizedURI, options) || create(uri, normalizedURI);
+    return uriConverter.exists(normalizedURI, options) || create(uri, normalizedURI) != null;
   }
 
   @Override
   public Map<String, ?> getAttributes(URI uri, Map<?, ?> options)
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     if (!uriConverter.exists(normalizedURI, options))
     {
@@ -123,7 +137,7 @@ public class UserURIHandlerImpl extends URIHandlerImpl
   @Override
   public void setAttributes(URI uri, Map<String, ?> attributes, Map<?, ?> options) throws IOException
   {
-    URI normalizedURI = SetupContext.resolveUser(uri);
+    URI normalizedURI = resolve(uri);
     URIConverter uriConverter = getURIConverter(options);
     if (!uriConverter.exists(normalizedURI, options))
     {
@@ -133,7 +147,7 @@ public class UserURIHandlerImpl extends URIHandlerImpl
     uriConverter.setAttributes(normalizedURI, attributes, options);
   }
 
-  private boolean create(URI uri, URI normalizedURI)
+  private Resource create(URI uri, URI normalizedURI)
   {
     String query = uri.query();
     if (query != null)
@@ -198,20 +212,25 @@ public class UserURIHandlerImpl extends URIHandlerImpl
       return saveResource(resource);
     }
 
-    return false;
+    return null;
   }
 
-  private static boolean saveResource(Resource resource)
+  private static Resource saveResource(Resource resource)
   {
+    if (resource.getURI().lastSegment().equals("${setup.filename}"))
+    {
+      return resource;
+    }
+
     try
     {
       resource.save(Collections.singletonMap(Resource.OPTION_SAVE_ONLY_IF_CHANGED, Resource.OPTION_SAVE_ONLY_IF_CHANGED_MEMORY_BUFFER));
-      return true;
+      return resource;
     }
     catch (IOException ex)
     {
       SetupCorePlugin.INSTANCE.log(ex);
-      return false;
+      return null;
     }
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -512,6 +512,9 @@ public class OomphPropertySheetPage extends ExtendedPropertySheetPage
                   UIPlugin.INSTANCE.log(ex);
                   return;
                 }
+
+                int shellStyle = (Integer)ReflectUtil.invokeMethod("getShellStyle", dialog);
+                ReflectUtil.invokeMethod(ReflectUtil.getMethod(dialog, "setShellStyle", int.class), dialog, new Integer(shellStyle | SWT.MAX));
 
                 if (dialog.open() == Window.OK)
                 {

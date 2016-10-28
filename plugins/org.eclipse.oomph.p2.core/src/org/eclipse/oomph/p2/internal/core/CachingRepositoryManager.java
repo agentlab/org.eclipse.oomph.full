@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Eike Stepper (Berlin, Germany) and others.
+ * Copyright (c) 2014-2016 Eike Stepper (Berlin, Germany) and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,6 +11,7 @@
 package org.eclipse.oomph.p2.internal.core;
 
 import org.eclipse.oomph.util.CollectionUtil;
+import org.eclipse.oomph.util.IOUtil;
 import org.eclipse.oomph.util.OfflineMode;
 import org.eclipse.oomph.util.PropertiesUtil;
 import org.eclipse.oomph.util.ReflectUtil;
@@ -71,6 +72,8 @@ import java.util.concurrent.atomic.AtomicLong;
 @SuppressWarnings("restriction")
 public class CachingRepositoryManager<T>
 {
+  public static final String BOGUS_SCHEME = "bogus";
+
   private static final Method METHOD_checkValidLocation = ReflectUtil.getMethod(AbstractRepositoryManager.class, "checkValidLocation", URI.class);
 
   private static final Method METHOD_enterLoad = ReflectUtil.getMethod(AbstractRepositoryManager.class, "enterLoad", URI.class, IProgressMonitor.class);
@@ -124,7 +127,7 @@ public class CachingRepositoryManager<T>
       URI rootLocation = agentLocation.getRootLocation();
       if (rootLocation != null)
       {
-        if (!LazyProfileRegistryComponent.OsgiHelper.canWrite(new File(rootLocation.getPath())))
+        if (!IOUtil.canWriteFolder(new File(rootLocation.getPath())))
         {
           ReflectUtil.setValue("agentLocation", delegate, null);
         }
@@ -743,9 +746,16 @@ public class CachingRepositoryManager<T>
         {
           // Determine the location within the mirror, create a new artifact activity for it, and see if there was previous such an activity.
           URI artifactURI = new URI(location + relativeLocation.getPath());
-          ArtifactActivity previousActivity = artifactActivities.put(artifactURI, new ArtifactActivity(selectedMirror));
+          ArtifactActivity newActivity = new ArtifactActivity(selectedMirror);
+          ArtifactActivity previousActivity = artifactActivities.put(artifactURI, newActivity);
           if (previousActivity != null)
           {
+            if (!newActivity.retry(previousActivity))
+            {
+              // Return a bogus URI that will refuse to try this artifactURI from this mirror again.
+              return new URI(BOGUS_SCHEME + ":" + artifactURI);
+            }
+
             // We don't expect to have repeated requests for the same artifact.
             // But this does happen if it's a .pack.gz produced by a version of Java newer than the version of Java being used by this process.
             monitor.subTask("Repeated attempts to download " + artifactURI + " probably because it can't be processed");
@@ -924,16 +934,30 @@ public class CachingRepositoryManager<T>
             mirrors = new MirrorInfo[0];
           }
 
-          // Use on the first two thirds of the list.
+          // Use only the first two thirds of the list.
           int limit = (mirrors.length + 2) / 3;
-          mirrorActivities = new MirrorActivity[limit];
-          for (int i = 0; i < limit; i++)
+          if (limit == 0 && repositoryURI != null)
           {
-            // Convert the mirror info to our mirror activity representation.
-            MirrorInfo mirrorInfo = mirrors[i];
-            String locationString = getLocationString(mirrorInfo);
-            MirrorActivity mirrorActivity = new MirrorActivity(locationString);
-            mirrorActivities[i] = mirrorActivity;
+            // Even if there are no mirrors treat it as a single mirror so that activities and performance can always be monitored.
+            String locationString = repositoryURI.toString();
+            if (!locationString.endsWith("/"))
+            {
+              locationString += '/';
+            }
+
+            mirrorActivities = new MirrorActivity[] { new MirrorActivity(locationString) };
+          }
+          else
+          {
+            mirrorActivities = new MirrorActivity[limit];
+            for (int i = 0; i < limit; i++)
+            {
+              // Convert the mirror info to our mirror activity representation.
+              MirrorInfo mirrorInfo = mirrors[i];
+              String locationString = getLocationString(mirrorInfo);
+              MirrorActivity mirrorActivity = new MirrorActivity(locationString);
+              mirrorActivities[i] = mirrorActivity;
+            }
           }
 
           // Do ourselves as a listener.
@@ -972,6 +996,8 @@ public class CachingRepositoryManager<T>
 
         private long size;
 
+        private int retryCount;
+
         public ArtifactActivity(MirrorActivity mirrorActivity)
         {
           this.mirrorActivity = mirrorActivity;
@@ -1006,6 +1032,16 @@ public class CachingRepositoryManager<T>
         public long getSize()
         {
           return size;
+        }
+
+        public boolean retry(ArtifactActivity previousArtifactActivity)
+        {
+          if (previousArtifactActivity != null)
+          {
+            retryCount = previousArtifactActivity.retryCount + 1;
+          }
+
+          return retryCount < 3;
         }
 
         @Override
