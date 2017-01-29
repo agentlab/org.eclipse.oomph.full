@@ -151,6 +151,8 @@ public class ProfileDetailsComposite extends Composite
 
     tabItem.setControl(viewer.getTree());
 
+    AgentManagerComposite.addDragSupport(viewer);
+
     UIUtil.asyncExec(new Runnable()
     {
       public void run()
@@ -189,6 +191,8 @@ public class ProfileDetailsComposite extends Composite
     Table table = viewer.getTable();
     TableColumn idColumn = new TableColumn(table, SWT.LEFT);
     layout.setColumnData(idColumn, new ColumnWeightData(100));
+
+    AgentManagerComposite.addDragSupport(viewer);
 
     UIUtil.asyncExec(viewer.getControl(), new Runnable()
     {
@@ -240,7 +244,7 @@ public class ProfileDetailsComposite extends Composite
     valueColumn.setText("Value");
     layout.setColumnData(valueColumn, new ColumnWeightData(60));
 
-    UIUtil.asyncExec(new Runnable()
+    UIUtil.asyncExec(viewer.getControl(), new Runnable()
     {
       public void run()
       {

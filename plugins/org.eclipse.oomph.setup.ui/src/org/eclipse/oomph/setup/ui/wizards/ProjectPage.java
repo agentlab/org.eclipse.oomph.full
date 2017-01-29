@@ -332,11 +332,13 @@ public class ProjectPage extends SetupWizardPage
     AccessUtil.setKey(collapseAllButton, "collapse");
 
     final boolean supportsIndexSwitching = getPreviousPage() instanceof SetupWizardPage;
-    configurationListener = new ConfigurationListener(getWizard().getTransferSupport(), catalogManager, filterToolBar)
+    configurationListener = new ConfigurationListener(getWizard(), catalogManager, filterToolBar)
     {
       @Override
       protected void filter(Collection<? extends Resource> resources)
       {
+        super.filter(resources);
+
         if (!supportsIndexSwitching)
         {
           for (Iterator<? extends Resource> it = resources.iterator(); it.hasNext();)
@@ -585,10 +587,16 @@ public class ProjectPage extends SetupWizardPage
       {
         super.notifyChanged(notification);
 
-        Workspace workspace = getWorkspace();
+        final Workspace workspace = getWorkspace();
         if (streamViewer.getInput() != workspace)
         {
-          streamViewer.setInput(workspace);
+          getShell().getDisplay().asyncExec(new Runnable()
+          {
+            public void run()
+            {
+              streamViewer.setInput(workspace);
+            }
+          });
         }
 
         if (notification.getFeature() == SetupPackage.Literals.CATALOG_SELECTION__PROJECT_CATALOGS)
@@ -2433,7 +2441,7 @@ public class ProjectPage extends SetupWizardPage
 
   public static class ConfigurationListener extends ShellAdapter
   {
-    private final SetupTransferSupport transferSupport;
+    private final SetupWizard setupWizard;
 
     private final CatalogManager catalogManager;
 
@@ -2441,9 +2449,9 @@ public class ProjectPage extends SetupWizardPage
 
     private ToolItem applyConfigurationButton;
 
-    public ConfigurationListener(SetupTransferSupport transferSupport, CatalogManager catalogManager, ToolBar toolBar)
+    public ConfigurationListener(SetupWizard setupWizard, CatalogManager catalogManager, ToolBar toolBar)
     {
-      this.transferSupport = transferSupport;
+      this.setupWizard = setupWizard;
       this.catalogManager = catalogManager;
       this.toolBar = toolBar;
     }
@@ -2456,7 +2464,7 @@ public class ProjectPage extends SetupWizardPage
 
     public void checkConfigurationAvailability()
     {
-      Collection<? extends Resource> resources = transferSupport.getResources();
+      Collection<? extends Resource> resources = setupWizard.getTransferSupport().getResources();
       filter(resources);
 
       URI indexLocation = getIndexURI(resources);
@@ -2469,7 +2477,7 @@ public class ProjectPage extends SetupWizardPage
           @Override
           public void widgetSelected(SelectionEvent e)
           {
-            transferSupport.resourcesDropped(resources);
+            setupWizard.getTransferSupport().resourcesDropped(resources);
             disposeApplyConfigurationButton();
           }
 
@@ -2517,6 +2525,17 @@ public class ProjectPage extends SetupWizardPage
 
     protected void filter(Collection<? extends Resource> resources)
     {
+      for (Resource appliedConfigurationResource : setupWizard.getAppliedConfigurationResources())
+      {
+        URI uri = appliedConfigurationResource.getURI();
+        for (Iterator<? extends Resource> iterator = resources.iterator(); iterator.hasNext();)
+        {
+          if (uri.equals(iterator.next().getURI()))
+          {
+            iterator.remove();
+          }
+        }
+      }
     }
 
     private void disposeApplyConfigurationButton()

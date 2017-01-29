@@ -101,6 +101,7 @@ import org.eclipse.emf.edit.EMFEditPlugin;
 import org.eclipse.emf.edit.command.AbstractOverrideableCommand;
 import org.eclipse.emf.edit.command.AddCommand;
 import org.eclipse.emf.edit.command.CopyCommand;
+import org.eclipse.emf.edit.command.DragAndDropFeedback;
 import org.eclipse.emf.edit.command.RemoveCommand;
 import org.eclipse.emf.edit.domain.AdapterFactoryEditingDomain;
 import org.eclipse.emf.edit.domain.EditingDomain;
@@ -232,6 +233,7 @@ import org.eclipse.ui.IEditorSite;
 import org.eclipse.ui.IPartListener;
 import org.eclipse.ui.ISelectionListener;
 import org.eclipse.ui.ISelectionService;
+import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWindowListener;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchPart;
@@ -1293,7 +1295,7 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
               final Collection<?> collection)
           {
             final ResourceSet resourceSet = (ResourceSet)owner;
-            class LoadResourceCommand extends AbstractOverrideableCommand implements AbstractCommand.NonDirtying
+            class LoadResourceCommand extends AbstractOverrideableCommand implements AbstractCommand.NonDirtying, DragAndDropFeedback
             {
               protected LoadResourceCommand(EditingDomain domain)
               {
@@ -1332,7 +1334,6 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
                     catch (RuntimeException exception)
                     {
                       resource = resourceSet.getResource(uri, false);
-                      EMFEditPlugin.INSTANCE.log(exception);
                     }
                   }
 
@@ -1378,6 +1379,21 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
               public String doGetLabel()
               {
                 return EMFEditPlugin.INSTANCE.getString("_UI_LoadResources_label");
+              }
+
+              public boolean validate(Object owner, float location, int operations, int operation, Collection<?> collection)
+              {
+                return true;
+              }
+
+              public int getFeedback()
+              {
+                return FEEDBACK_SELECT;
+              }
+
+              public int getOperation()
+              {
+                return DROP_COPY;
               }
             }
 
@@ -2460,7 +2476,16 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
       {
         try
         {
-          getSite().getPage().showView("org.eclipse.ui.views.PropertySheet", null, IWorkbenchPage.VIEW_VISIBLE);
+          IViewPart propertiesView = getSite().getPage().showView("org.eclipse.ui.views.PropertySheet", null, IWorkbenchPage.VIEW_VISIBLE);
+          if (propertiesView instanceof PropertySheet)
+          {
+            // If the properties view wasn't showing, but is present in a different perspective,
+            // then it ends up being shown, but it doesn't show the current selection.
+            // If we just set the selection, it thinks that's still the same selection so we must change it twice to ensure that the current selection is shown.
+            PropertySheet propertySheet = (PropertySheet)propertiesView;
+            propertySheet.selectionChanged(SetupEditor.this, new StructuredSelection());
+            propertySheet.selectionChanged(SetupEditor.this, SetupEditor.this.getSelection());
+          }
         }
         catch (PartInitException ex)
         {
@@ -2873,7 +2898,8 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
               if (o instanceof EObject)
               {
                 EObject eObject = (EObject)o;
-                if (eObject.eResource() == resource && setupTaskPerformer.isVariableUsed(name, eObject, false))
+                if (eObject.eResource() == resource
+                    && (setupTaskPerformer.isVariableUsed(name, eObject, false) || setupTaskPerformer.isFilterUsed(name, eObject)))
                 {
                   variableUsages.add(eObject);
                 }
@@ -5208,7 +5234,7 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
     {
       public void selectionChanged(IWorkbenchPart part, ISelection selection)
       {
-        setWorkbenchPart(part);
+        getDockable().setWorkbenchPart(part);
         if (locationListener.setupEditor != null)
         {
           if (selection instanceof IStructuredSelection)
@@ -5233,7 +5259,7 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
     }
 
     @Override
-    protected boolean handleWorkbenchPart(IWorkbenchPart part)
+    public boolean handleWorkbenchPart(IWorkbenchPart part)
     {
       // Determines if the part corresponds to one that can show a setup editor's information via its selection.
       SetupEditor setupEditor = null;
@@ -5262,7 +5288,7 @@ public class SetupEditor extends MultiPageEditorPart implements IEditingDomainPr
      */
     protected void setInput(SetupEditor setupEditor, Object input)
     {
-      setWorkbenchPart(setupEditor);
+      getDockable().setWorkbenchPart(setupEditor);
 
       // If the input is a URI...
       LocationEvent event = new LocationEvent(browser == null ? noBrowser : browser);

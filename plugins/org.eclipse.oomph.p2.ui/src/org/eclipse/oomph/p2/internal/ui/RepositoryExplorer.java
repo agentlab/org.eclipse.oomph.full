@@ -18,6 +18,7 @@ import org.eclipse.oomph.p2.P2Exception;
 import org.eclipse.oomph.p2.P2Factory;
 import org.eclipse.oomph.p2.P2Package;
 import org.eclipse.oomph.p2.Repository;
+import org.eclipse.oomph.p2.RepositoryList;
 import org.eclipse.oomph.p2.Requirement;
 import org.eclipse.oomph.p2.VersionSegment;
 import org.eclipse.oomph.p2.core.Agent;
@@ -26,6 +27,7 @@ import org.eclipse.oomph.p2.core.RepositoryProvider;
 import org.eclipse.oomph.p2.impl.RequirementImpl;
 import org.eclipse.oomph.p2.internal.ui.RepositoryManager.RepositoryManagerListener;
 import org.eclipse.oomph.p2.provider.RequirementItemProvider;
+import org.eclipse.oomph.ui.OomphDialog;
 import org.eclipse.oomph.ui.SearchField;
 import org.eclipse.oomph.ui.SearchField.FilterHandler;
 import org.eclipse.oomph.ui.UIUtil;
@@ -33,11 +35,13 @@ import org.eclipse.oomph.util.CollectionUtil;
 import org.eclipse.oomph.util.ObjectUtil;
 import org.eclipse.oomph.util.StringUtil;
 
-import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.edit.ui.action.CopyAction;
+import org.eclipse.emf.edit.ui.action.PasteAction;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.OperationCanceledException;
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
@@ -50,6 +54,7 @@ import org.eclipse.equinox.p2.core.ProvisionException;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.metadata.IProvidedCapability;
 import org.eclipse.equinox.p2.metadata.IRequirement;
+import org.eclipse.equinox.p2.metadata.MetadataFactory;
 import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionRange;
 import org.eclipse.equinox.p2.metadata.expression.IMatchExpression;
@@ -58,13 +63,21 @@ import org.eclipse.equinox.p2.query.QueryUtil;
 import org.eclipse.equinox.p2.repository.metadata.IMetadataRepository;
 import org.eclipse.equinox.p2.repository.metadata.IMetadataRepositoryManager;
 import org.eclipse.jface.action.Action;
+import org.eclipse.jface.action.ActionContributionItem;
 import org.eclipse.jface.action.IAction;
+import org.eclipse.jface.action.IContributionItem;
+import org.eclipse.jface.action.IMenuListener;
+import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.IToolBarManager;
+import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.dialogs.Dialog;
+import org.eclipse.jface.dialogs.IDialogConstants;
 import org.eclipse.jface.dialogs.IDialogSettings;
 import org.eclipse.jface.viewers.ArrayContentProvider;
 import org.eclipse.jface.viewers.ComboViewer;
+import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredContentProvider;
@@ -80,12 +93,18 @@ import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.jface.viewers.ViewerComparator;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.CCombo;
+import org.eclipse.swt.custom.StyleRange;
+import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.Transfer;
+import org.eclipse.swt.events.DisposeEvent;
+import org.eclipse.swt.events.DisposeListener;
 import org.eclipse.swt.events.FocusEvent;
 import org.eclipse.swt.events.FocusListener;
 import org.eclipse.swt.events.KeyAdapter;
 import org.eclipse.swt.events.KeyEvent;
+import org.eclipse.swt.events.MouseAdapter;
+import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Color;
@@ -99,28 +118,39 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IActionBars;
+import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IViewPart;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PartInitException;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.actions.ActionFactory;
 import org.eclipse.ui.forms.FormColors;
 import org.eclipse.ui.forms.widgets.Form;
 import org.eclipse.ui.forms.widgets.FormToolkit;
 import org.eclipse.ui.part.ViewPart;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author Eike Stepper
@@ -131,10 +161,17 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
 
   private static final IDialogSettings SETTINGS = P2UIPlugin.INSTANCE.getDialogSettings(RepositoryExplorer.class.getSimpleName());
 
-  private static final int DND_OPERATIONS = DND.DROP_COPY | DND.DROP_MOVE | DND.DROP_LINK;
+  static final int DND_OPERATIONS = DND.DROP_COPY | DND.DROP_MOVE | DND.DROP_LINK;
 
-  private static final Transfer[] DND_TRANSFERS = OomphTransferDelegate.asTransfers(org.eclipse.oomph.internal.ui.OomphTransferDelegate.DELEGATES)
-      .toArray(new Transfer[OomphTransferDelegate.asTransfers(org.eclipse.oomph.internal.ui.OomphTransferDelegate.DELEGATES).size()]);
+  static final List<? extends OomphTransferDelegate> DND_DELEGATES = Collections.singletonList(new OomphTransferDelegate.TextTransferDelegate());
+
+  public static final Transfer[] DND_TRANSFERS = new Transfer[] { DND_DELEGATES.get(0).getTransfer() };
+
+  static final List<? extends OomphTransferDelegate> DND_REPOSITORY_DELEGATES = Arrays
+      .asList(new OomphTransferDelegate[] { new OomphTransferDelegate.TextTransferDelegate(), new OomphTransferDelegate.FileTransferDelegate() });
+
+  public static final Transfer[] DND_REPOSITORY_TRANSFERS = new Transfer[] { DND_REPOSITORY_DELEGATES.get(0).getTransfer(),
+      DND_REPOSITORY_DELEGATES.get(1).getTransfer() };
 
   private static final String DEFAULT_CAPABILITY_NAMESPACE = IInstallableUnit.NAMESPACE_IU_ID;
 
@@ -164,7 +201,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
 
   private final Mode capabilitiesMode = new CapabilitiesMode();
 
-  private final RepositoryFocusListener repositoryFocusListener = new RepositoryFocusListener();
+  private final RepositoryComboHandler repositoryComboHandler = new RepositoryComboHandler();
 
   private final RepositoryHistoryListener repositoryHistoryListener = new RepositoryHistoryListener();
 
@@ -255,10 +292,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   @Override
   public void setFocus()
   {
-    if (RepositoryManager.INSTANCE.getActiveRepository() != null)
-    {
-      repositoryCombo.setFocus();
-    }
+    repositoryCombo.setFocus();
   }
 
   private void updateMode()
@@ -296,8 +330,20 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         }
       });
 
-      analyzeJob.reschedule();
+      itemsViewer.addDoubleClickListener(new IDoubleClickListener()
+      {
+        public void doubleClick(DoubleClickEvent event)
+        {
+          String id = getSelectedCapatiblityID(itemsViewer);
+          if (id != null)
+          {
+            showIUDetails(id, null);
+          }
+        }
+      });
+
       collapseAllAction.updateEnablement();
+      analyzeJob.reschedule();
     }
   }
 
@@ -311,7 +357,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       itemsViewerInput.setChildren(items);
       itemsViewer.setInput(itemsViewerInput);
 
-      if (itemsViewer instanceof TreeViewer && filter != null)
+      if (itemsViewer instanceof TreeViewer && filter != null && !(mode instanceof CapabilitiesMode))
       {
         TreeViewer treeViewer = (TreeViewer)itemsViewer;
         treeViewer.expandAll();
@@ -358,14 +404,9 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     updateMode();
 
     String activeRepository = RepositoryManager.INSTANCE.getActiveRepository();
-    if (activeRepository == null)
+    repositoryComboHandler.setActiveRepository(activeRepository);
+    if (activeRepository != null)
     {
-      // Force hint to be shown.
-      repositoryFocusListener.focusLost(null);
-    }
-    else
-    {
-      repositoryCombo.setText(activeRepository);
       triggerLoad(activeRepository);
     }
 
@@ -402,8 +443,19 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   {
     repositoryCombo = createCombo(container, SWT.BORDER, true);
     repositoryCombo.setToolTipText("Repository location (type a URL, drop a repository or pick from the drop down history)");
-    repositoryCombo.addFocusListener(repositoryFocusListener);
+    repositoryCombo.addFocusListener(repositoryComboHandler);
     repositoryCombo.addKeyListener(repositoryHistoryListener);
+    repositoryCombo.addMouseListener(new MouseAdapter()
+    {
+      @Override
+      public void mouseDown(MouseEvent e)
+      {
+        if (!repositoryCombo.isFocusControl())
+        {
+          repositoryCombo.setFocus();
+        }
+      }
+    });
 
     repositoryViewer = new ComboViewer(repositoryCombo);
     repositoryViewer.setContentProvider(new RepositoryContentProvider());
@@ -411,8 +463,27 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     repositoryViewer.setInput(RepositoryManager.INSTANCE);
     repositoryViewer.addSelectionChangedListener(repositoryHistoryListener);
 
-    repositoryViewer.addDropSupport(DND_OPERATIONS, DND_TRANSFERS, new GeneralDropAdapter(repositoryViewer, P2Factory.eINSTANCE.createRepositoryList(),
-        P2Package.Literals.REPOSITORY_LIST__REPOSITORIES, new DroppedObjectHandler()
+    final GeneralDragAdapter generalDragAdapter = new GeneralDragAdapter(repositoryViewer, new GeneralDragAdapter.DraggedObjectsFactory()
+    {
+      public List<Object> createDraggedObjects(ISelection selection) throws Exception
+      {
+        List<Object> result = new ArrayList<Object>();
+        String text = repositoryCombo.getText();
+        Point selectionRange = repositoryCombo.getSelection();
+        if (selectionRange.y - selectionRange.x > 0)
+        {
+          result.add(text.substring(selectionRange.x, selectionRange.y));
+        }
+
+        return result;
+      }
+    }, DND_REPOSITORY_DELEGATES);
+
+    repositoryViewer.addDragSupport(DND_OPERATIONS, DND_TRANSFERS, generalDragAdapter);
+
+    final RepositoryList repositoryList = P2Factory.eINSTANCE.createRepositoryList();
+    repositoryViewer.addDropSupport(DND_OPERATIONS, DND_REPOSITORY_TRANSFERS,
+        new GeneralDropAdapter(repositoryViewer, repositoryList, P2Package.Literals.REPOSITORY_LIST__REPOSITORIES, new DroppedObjectHandler()
         {
           public void handleDroppedObject(Object object) throws Exception
           {
@@ -427,6 +498,83 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
             }
           }
         }));
+
+    MenuManager contextMenu = generalDragAdapter.getContextMenu();
+    contextMenu.addMenuListener(new IMenuListener()
+    {
+      public void menuAboutToShow(IMenuManager manager)
+      {
+        ISharedImages sharedImages = PlatformUI.getWorkbench().getSharedImages();
+
+        IContributionItem copyAction = manager.find(ActionFactory.COPY.getId());
+        if (copyAction == null)
+        {
+          Action generalCopyAction = new Action("Copy")
+          {
+            @Override
+            public void run()
+            {
+              repositoryCombo.copy();
+            }
+          };
+
+          Point selection = repositoryCombo.getSelection();
+          generalCopyAction.setEnabled(selection.y - selection.x > 0);
+          generalCopyAction.setId(ActionFactory.COPY.getId());
+          generalCopyAction.setImageDescriptor(sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_COPY));
+
+          copyAction = new ActionContributionItem(generalCopyAction);
+          manager.add(copyAction);
+        }
+
+        Action cutAction = new Action("Cut")
+        {
+          @Override
+          public void run()
+          {
+            repositoryCombo.cut();
+          }
+        };
+
+        cutAction.setEnabled(copyAction.isEnabled());
+        cutAction.setImageDescriptor(sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_CUT));
+        manager.insertBefore(copyAction.getId(), cutAction);
+
+        PasteAction pasteAction = new PasteAction(generalDragAdapter.getEditingDomain())
+        {
+          @Override
+          public void run()
+          {
+            super.run();
+
+            Collection<?> result = command.getResult();
+            String repository = result.iterator().next().toString();
+            repositoryCombo.setText(repository);
+            repositoryCombo.setSelection(new Point(0, repository.length()));
+            repositoryHistoryListener.selectionChanged(null);
+          }
+        };
+
+        pasteAction.setText("Paste");
+        pasteAction.setEnabled(pasteAction.updateSelection(new StructuredSelection(repositoryList)));
+
+        Action generalPasteAction = pasteAction;
+        if (!pasteAction.isEnabled())
+        {
+          generalPasteAction = new Action("Paste")
+          {
+            @Override
+            public void run()
+            {
+              repositoryCombo.paste();
+            }
+          };
+        }
+
+        generalPasteAction.setImageDescriptor(sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_PASTE));
+        manager.add(generalPasteAction);
+      }
+    });
   }
 
   private void createItemsArea(Composite parent)
@@ -494,6 +642,22 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     versionsViewer.setContentProvider(versionProvider);
     versionsViewer.setLabelProvider(versionProvider);
     addDragSupport(versionsViewer);
+
+    versionsViewer.addDoubleClickListener(new IDoubleClickListener()
+    {
+      public void doubleClick(DoubleClickEvent event)
+      {
+        String id = getSelectedCapatiblityID(versionsViewer);
+        if (id != null)
+        {
+          Version version = getSelectedVersion(versionsViewer);
+          if (version != null)
+          {
+            showIUDetails(id, version);
+          }
+        }
+      }
+    });
 
     formToolkit.adapt(versionsViewer.getControl(), false, false);
 
@@ -648,13 +812,107 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     }
   }
 
-  private void addDragSupport(StructuredViewer viewer)
+  private String getSelectedCapatiblityID(Viewer viewer)
   {
-    viewer.addDragSupport(DND_OPERATIONS, DND_TRANSFERS, new GeneralDragAdapter(viewer, new GeneralDragAdapter.DraggedObjectsFactory()
+    Object firstItem = ((IStructuredSelection)viewer.getSelection()).getFirstElement();
+    if (firstItem instanceof VersionedItem)
     {
-      public List<EObject> createDraggedObjects(ISelection selection) throws Exception
+      VersionedItem item = (VersionedItem)firstItem;
+      return item.getName();
+    }
+
+    if (firstItem instanceof VersionProvider.ItemVersion)
+    {
+      VersionProvider.ItemVersion itemVersion = (VersionProvider.ItemVersion)firstItem;
+      return itemVersion.getItem().getName();
+    }
+
+    return null;
+  }
+
+  private Version getSelectedVersion(Viewer viewer)
+  {
+    Object firstVersion = ((IStructuredSelection)viewer.getSelection()).getFirstElement();
+    if (firstVersion instanceof VersionProvider.ItemVersion)
+    {
+      VersionProvider.ItemVersion itemVersion = (VersionProvider.ItemVersion)firstVersion;
+      return itemVersion.getVersion();
+    }
+
+    return null;
+  }
+
+  protected void showIUDetails(String id, Version version)
+  {
+    try
+    {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      IUWriter writer = new IUWriter(baos);
+      boolean first = true;
+
+      VersionRange versionRange = version == null ? VersionRange.emptyRange
+          : P2Factory.eINSTANCE.createVersionRange(version, versionProvider.getVersionSegment(), compatibleVersion);
+      IRequirement requirement = MetadataFactory.createRequirement(expertMode ? currentNamespace : DEFAULT_CAPABILITY_NAMESPACE, id, versionRange, null, true,
+          true, true);
+      IMatchExpression<IInstallableUnit> matches = requirement.getMatches();
+      IQueryResult<IInstallableUnit> query = installableUnits.query(QueryUtil.createMatchQuery(matches), new NullProgressMonitor());
+
+      List<Version> versions = new ArrayList<Version>();
+      int count = 0;
+      int limit = 100;
+      for (IInstallableUnit iu : P2Util.asIterable(query))
       {
-        List<EObject> result = new ArrayList<EObject>();
+        for (IProvidedCapability providedCapability : iu.getProvidedCapabilities())
+        {
+          if (currentNamespace.equals(providedCapability.getNamespace()) && id.equals(providedCapability.getName()))
+          {
+            Version providedCapabilityVersion = providedCapability.getVersion();
+            if (versionRange.isIncluded(providedCapabilityVersion))
+            {
+              versions.add(providedCapabilityVersion);
+            }
+          }
+        }
+
+        if (++count <= limit)
+        {
+          if (first)
+          {
+            first = false;
+          }
+          else
+          {
+            writer.newLine();
+          }
+
+          writer.writeInstallableUnit(iu);
+          writer.flush();
+        }
+      }
+
+      if (count > limit)
+      {
+        writer.newLine();
+        writer.writeString(count - limit + " more...");
+        writer.newLine();
+      }
+
+      String xml = baos.toString("UTF-8");
+      new IUDialog(getSite().getShell(), xml, expertMode ? currentNamespace : null, id, versions).open();
+    }
+    catch (Exception ex)
+    {
+      P2UIPlugin.INSTANCE.log(ex);
+    }
+  }
+
+  private void addDragSupport(final StructuredViewer viewer)
+  {
+    final GeneralDragAdapter.DraggedObjectsFactory draggedObjectsFactory = new GeneralDragAdapter.DraggedObjectsFactory()
+    {
+      public List<Object> createDraggedObjects(ISelection selection) throws Exception
+      {
+        List<Object> result = new ArrayList<Object>();
 
         IStructuredSelection ssel = (IStructuredSelection)selection;
         for (Iterator<?> it = ssel.iterator(); it.hasNext();)
@@ -672,12 +930,12 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
             VersionSegment versionSegment = versionProvider.getVersionSegment();
             versionRange = P2Factory.eINSTANCE.createVersionRange(version, versionSegment, compatibleVersion);
 
-            filter = RequirementImpl.formatMatchExpression(itemVersion.getFilter());
+            filter = getFilter(itemVersion.getFilters());
 
-            element = ((IStructuredSelection)itemsViewer.getSelection()).getFirstElement();
+            element = itemVersion.getItem();
           }
 
-          if (element instanceof Item)
+          if (element instanceof Item && !(element instanceof StatusItem) && !(element instanceof LoadingItem))
           {
             Item item = (Item)element;
 
@@ -687,20 +945,13 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
               if (filter == null && item instanceof VersionedItem)
               {
                 VersionedItem versionedItem = (VersionedItem)item;
-
-                for (IMatchExpression<IInstallableUnit> matchExpression : versionedItem.getVersions().values())
+                Set<IMatchExpression<IInstallableUnit>> allFilters = new LinkedHashSet<IMatchExpression<IInstallableUnit>>();
+                for (Set<IMatchExpression<IInstallableUnit>> filterSets : versionedItem.getVersions().values())
                 {
-                  String string = RequirementImpl.formatMatchExpression(matchExpression);
-                  if (filter == null || filter.equals(string))
-                  {
-                    filter = string;
-                  }
-                  else
-                  {
-                    filter = null;
-                    break;
-                  }
+                  allFilters.addAll(filterSets);
                 }
+
+                filter = getFilter(allFilters);
               }
 
               Requirement requirement = P2Factory.eINSTANCE.createRequirement();
@@ -715,7 +966,140 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
 
         return result;
       }
-    }));
+    };
+
+    final GeneralDragAdapter generalDragAdapter = new GeneralDragAdapter(viewer, draggedObjectsFactory, DND_DELEGATES);
+
+    viewer.addDragSupport(DND_OPERATIONS, DND_TRANSFERS, generalDragAdapter);
+
+    final CopyAction copyAction = new CopyAction(generalDragAdapter.getEditingDomain());
+
+    try
+    {
+      ISharedImages sharedImages = PlatformUI.getWorkbench().getSharedImages();
+      copyAction.setImageDescriptor(sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_COPY));
+      copyAction.setText("Copy with Version Range");
+    }
+    catch (RuntimeException ex)
+    {
+      // Ignore it if we can't set an image.
+    }
+
+    MenuManager contextMenu = generalDragAdapter.getContextMenu();
+
+    final CopyAction simpleCopyAction = generalDragAdapter.getCopyAction();
+
+    viewer.getControl().addFocusListener(new FocusListener()
+    {
+      public void focusLost(FocusEvent e)
+      {
+        getViewSite().getActionBars().setGlobalActionHandler(ActionFactory.COPY.getId(), null);
+      }
+
+      public void focusGained(FocusEvent e)
+      {
+        getViewSite().getActionBars().setGlobalActionHandler(ActionFactory.COPY.getId(), simpleCopyAction);
+      }
+    });
+
+    viewer.addSelectionChangedListener(new ISelectionChangedListener()
+    {
+      public void selectionChanged(SelectionChangedEvent event)
+      {
+        List<Object> selectedObjects = new ArrayList<Object>();
+        try
+        {
+          selectedObjects.addAll(draggedObjectsFactory.createDraggedObjects(event.getSelection()));
+        }
+        catch (Exception ex)
+        {
+          P2UIPlugin.INSTANCE.log(ex);
+        }
+
+        simpleCopyAction.setEnabled(simpleCopyAction.updateSelection(new StructuredSelection(selectedObjects)));
+      }
+    });
+
+    contextMenu.addMenuListener(new IMenuListener()
+    {
+      final Action showDetailsAction = new Action("Show Details...")
+      {
+        @Override
+        public void run()
+        {
+          String id = getSelectedCapatiblityID(viewer);
+          if (id != null)
+          {
+            showIUDetails(id, getSelectedVersion(viewer));
+          }
+        }
+      };
+
+      public void menuAboutToShow(IMenuManager manager)
+      {
+        IStructuredSelection selection = (IStructuredSelection)viewer.getSelection();
+        List<Object> versionItems = new ArrayList<Object>();
+        for (Object object : selection.toArray())
+        {
+          Object[] elements = versionProvider.getElements(object);
+          if (elements.length > 0)
+          {
+            versionItems.add(elements[elements.length - 1]);
+          }
+        }
+
+        try
+        {
+          List<Object> draggedObjects = draggedObjectsFactory.createDraggedObjects(new StructuredSelection(versionItems));
+          if (!draggedObjects.isEmpty())
+          {
+            copyAction.updateSelection(new StructuredSelection(draggedObjects));
+            manager.add(copyAction);
+
+            manager.add(new Separator());
+            manager.add(showDetailsAction);
+          }
+        }
+        catch (Exception ex)
+        {
+          P2UIPlugin.INSTANCE.log(ex);
+        }
+      }
+    });
+  }
+
+  private String getFilter(Set<IMatchExpression<IInstallableUnit>> filters)
+  {
+    if (filters.contains(null))
+    {
+      return null;
+    }
+
+    Set<String> expressions = new LinkedHashSet<String>();
+    for (IMatchExpression<IInstallableUnit> filter : filters)
+    {
+      expressions.add(RequirementImpl.formatMatchExpression(filter));
+    }
+
+    if (expressions.size() == 1)
+    {
+      return expressions.iterator().next();
+    }
+
+    StringBuilder result = new StringBuilder("");
+    for (String expression : expressions)
+    {
+      if (result.length() == 0)
+      {
+        result.append("(|");
+      }
+
+      result.append(expression);
+    }
+
+    result.append(')');
+
+    return result.toString();
   }
 
   private static String[] sortStrings(Collection<String> c)
@@ -818,6 +1202,144 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   /**
    * @author Eike Stepper
    */
+  @SuppressWarnings("restriction")
+  private static final class IUWriter extends org.eclipse.equinox.internal.p2.metadata.repository.io.MetadataWriter
+  {
+    private ByteArrayOutputStream output;
+
+    public IUWriter(ByteArrayOutputStream output) throws UnsupportedEncodingException
+    {
+      super(output, null);
+      this.output = output;
+
+      flush();
+      output.reset();
+    }
+
+    @Override
+    public void writeInstallableUnit(IInstallableUnit resolvedIU)
+    {
+      // Just make this method publicly available.
+      super.writeInstallableUnit(resolvedIU);
+    }
+
+    @Override
+    public void flush()
+    {
+      // Just make this method publicly available.
+      super.flush();
+    }
+
+    public void newLine()
+    {
+      writeString(StringUtil.NL);
+    }
+
+    public void writeString(String string)
+    {
+      try
+      {
+        byte[] bytes = string.getBytes("UTF-8");
+        output.write(bytes, 0, bytes.length);
+      }
+      catch (Exception ex)
+      {
+        P2UIPlugin.INSTANCE.log(ex);
+      }
+    }
+  }
+
+  /**
+   * @author Eike Stepper
+   */
+  private static final class IUDialog extends OomphDialog
+  {
+    public static final String TITLE = "Installable Unit Details";
+
+    private final String xml;
+
+    private Pattern pattern;
+
+    public IUDialog(Shell parentShell, String xml, String namespace, String id, List<Version> versions)
+    {
+      super(parentShell, TITLE, 900, 750, P2UIPlugin.INSTANCE, false);
+      setShellStyle(SWT.TITLE | SWT.MAX | SWT.RESIZE | SWT.BORDER | SWT.APPLICATION_MODAL);
+      this.xml = xml;
+
+      StringBuilder expression = new StringBuilder();
+      if (namespace == null)
+      {
+        expression.append("<unit[^>]+'>");
+      }
+      else
+      {
+        expression.append("<provided namespace='").append(namespace).append("' name='").append(id).append("' version='(");
+        for (int i = 0, size = versions.size(); i < size; ++i)
+        {
+          if (i != 0)
+          {
+            expression.append('|');
+          }
+
+          expression.append(versions.get(i));
+        }
+
+        expression.append(")'/>");
+      }
+
+      pattern = Pattern.compile(expression.toString());
+    }
+
+    @Override
+    protected String getShellText()
+    {
+      return TITLE;
+    }
+
+    @Override
+    protected String getDefaultMessage()
+    {
+      return "Browse the XML representation of the selected installable units.";
+    }
+
+    @Override
+    protected String getImagePath()
+    {
+      return "wizban/ProfileDetails.png";
+    }
+
+    @Override
+    protected void createUI(Composite parent)
+    {
+      StyledText text = new StyledText(parent, SWT.WRAP | SWT.V_SCROLL | SWT.H_SCROLL);
+      text.setBackground(text.getDisplay().getSystemColor(SWT.COLOR_WIDGET_BACKGROUND));
+      text.setLayoutData(new GridData(GridData.FILL_BOTH));
+      text.setText(xml);
+      text.setEditable(false);
+
+      List<StyleRange> styleRanges = new ArrayList<StyleRange>();
+      for (Matcher matcher = pattern.matcher(xml); matcher.find();)
+      {
+        StyleRange styleRange = new StyleRange();
+        styleRange.start = matcher.start();
+        styleRange.length = matcher.end() - styleRange.start;
+        styleRange.fontStyle = SWT.BOLD;
+        styleRanges.add(styleRange);
+      }
+
+      text.setStyleRanges(styleRanges.toArray(new StyleRange[styleRanges.size()]));
+    }
+
+    @Override
+    protected void createButtonsForButtonBar(Composite parent)
+    {
+      createButton(parent, IDialogConstants.OK_ID, IDialogConstants.CLOSE_LABEL, true);
+    }
+  }
+
+  /**
+   * @author Eike Stepper
+   */
   private final class CollapseAllAction extends Action
   {
     public CollapseAllAction()
@@ -850,17 +1372,40 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   {
     public SearchAction()
     {
-      super("Search", P2UIPlugin.INSTANCE.getImageDescriptor("tool16/search"));
+      super("Search", Action.AS_CHECK_BOX);
+      setImageDescriptor(P2UIPlugin.INSTANCE.getImageDescriptor("tool16/search"));
       setToolTipText("Search Eclipse repositories by provided capabilities");
     }
 
     @Override
     public void run()
     {
-      SearchEclipseRepositoryDialog searchEclipseRepositoryDialog = new SearchEclipseRepositoryDialog(UIUtil.getShell());
-      if (searchEclipseRepositoryDialog.open() == Dialog.OK)
+      if (isChecked())
       {
-        activateAndLoadRepository(searchEclipseRepositoryDialog.getSelectedRepository());
+        final SearchEclipseRepositoryDialog searchEclipseRepositoryDialog = SearchEclipseRepositoryDialog.openFor(getSite().getWorkbenchWindow());
+        searchEclipseRepositoryDialog.getDockable().associate(this);
+        searchEclipseRepositoryDialog.getShell().addDisposeListener(new DisposeListener()
+        {
+          public void widgetDisposed(DisposeEvent e)
+          {
+            if (searchEclipseRepositoryDialog.getReturnCode() == Dialog.OK)
+            {
+              try
+              {
+                getViewSite().getWorkbenchWindow().getActivePage().showView(ID);
+                activateAndLoadRepository(searchEclipseRepositoryDialog.getSelectedRepository());
+              }
+              catch (PartInitException ex)
+              {
+                // This should never happen.
+              }
+            }
+          }
+        });
+      }
+      else
+      {
+        SearchEclipseRepositoryDialog.closeFor(getSite().getWorkbenchWindow());
       }
     }
   }
@@ -903,7 +1448,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         {
           public void run()
           {
-            setItems(new ErrorItem(status));
+            setItems(new StatusItem(status));
           }
         });
 
@@ -984,7 +1529,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
             IStatus status = P2UIPlugin.INSTANCE.getStatus(ex);
             if (messages.add(status.getMessage()))
             {
-              errors.add(new ErrorItem(status));
+              errors.add(new StatusItem(status));
             }
           }
         }
@@ -1174,7 +1719,15 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       {
         public void run()
         {
-          setItems(roots);
+          if (roots.length == 0)
+          {
+            setItems(new Item[] { new StatusItem(new Status(IStatus.WARNING, P2UIPlugin.INSTANCE.getSymbolicName(),
+                "No categorized items " + (filter == null ? "" : "matching '" + filter + "'") + ". Disable 'Group items by category' to see more.")) });
+          }
+          else
+          {
+            setItems(roots);
+          }
         }
       });
     }
@@ -1184,7 +1737,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         String categoryID, IProgressMonitor monitor)
     {
       Map<String, Item> children = new HashMap<String, Item>();
-      Map<Item, Map<Version, IMatchExpression<IInstallableUnit>>> versions = new HashMap<Item, Map<Version, IMatchExpression<IInstallableUnit>>>();
+      Map<Item, Map<Version, Set<IMatchExpression<IInstallableUnit>>>> versions = new HashMap<Item, Map<Version, Set<IMatchExpression<IInstallableUnit>>>>();
 
       for (IRequirement requirement : categories.get(categoryID))
       {
@@ -1264,14 +1817,14 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
                     {
                       IMatchExpression<IInstallableUnit> matchExpression = iu.getFilter();
 
-                      Map<Version, IMatchExpression<IInstallableUnit>> map = versions.get(child);
+                      Map<Version, Set<IMatchExpression<IInstallableUnit>>> map = versions.get(child);
                       if (map == null)
                       {
-                        map = new HashMap<Version, IMatchExpression<IInstallableUnit>>();
+                        map = new HashMap<Version, Set<IMatchExpression<IInstallableUnit>>>();
                         versions.put(child, map);
                       }
 
-                      map.put(version, matchExpression);
+                      CollectionUtil.add(map, version, matchExpression);
                     }
                   }
                 }
@@ -1281,7 +1834,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         }
       }
 
-      for (Map.Entry<Item, Map<Version, IMatchExpression<IInstallableUnit>>> entry : versions.entrySet())
+      for (Map.Entry<Item, Map<Version, Set<IMatchExpression<IInstallableUnit>>>> entry : versions.entrySet())
       {
         P2UIPlugin.checkCancelation(monitor);
 
@@ -1298,9 +1851,16 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         return null;
       }
 
-      CategoryItem categoryItem = new CategoryItem();
+      CategoryItem categoryItem = new CategoryItem(categoryID);
+      Map<Version, Set<IMatchExpression<IInstallableUnit>>> map = new LinkedHashMap<Version, Set<IMatchExpression<IInstallableUnit>>>();
+      for (IInstallableUnit categoryIU : ius.get(categoryID))
+      {
+        CollectionUtil.add(map, categoryIU.getVersion(), categoryIU.getFilter());
+      }
+
       categoryItem.setLabel(names.get(categoryID));
       categoryItem.setChildren(children.values().toArray(new Item[children.size()]));
+      categoryItem.setVersions(map);
       return categoryItem;
     }
   }
@@ -1334,7 +1894,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     public void analyzeInstallableUnits(IProgressMonitor monitor)
     {
       Map<String, String> names = new HashMap<String, String>();
-      Map<String, Map<Version, IMatchExpression<IInstallableUnit>>> versions = new HashMap<String, Map<Version, IMatchExpression<IInstallableUnit>>>();
+      Map<String, Map<Version, Set<IMatchExpression<IInstallableUnit>>>> versions = new HashMap<String, Map<Version, Set<IMatchExpression<IInstallableUnit>>>>();
 
       for (IInstallableUnit iu : installableUnits)
       {
@@ -1351,14 +1911,14 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
             Version version = iu.getVersion();
             IMatchExpression<IInstallableUnit> filter = iu.getFilter();
 
-            Map<Version, IMatchExpression<IInstallableUnit>> map = versions.get(id);
+            Map<Version, Set<IMatchExpression<IInstallableUnit>>> map = versions.get(id);
             if (map == null)
             {
-              map = new HashMap<Version, IMatchExpression<IInstallableUnit>>();
+              map = new HashMap<Version, Set<IMatchExpression<IInstallableUnit>>>();
               versions.put(id, map);
             }
 
-            map.put(version, filter);
+            CollectionUtil.add(map, version, filter);
           }
         }
       }
@@ -1370,7 +1930,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       {
         P2UIPlugin.checkCancelation(monitor);
         String id = iterator.next();
-        Map<Version, IMatchExpression<IInstallableUnit>> map = versions.get(id);
+        Map<Version, Set<IMatchExpression<IInstallableUnit>>> map = versions.get(id);
 
         FeatureItem featureItem = new FeatureItem(id);
         featureItem.setVersions(map);
@@ -1382,7 +1942,15 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       {
         public void run()
         {
-          setItems(featureItems);
+          if (featureItems.length == 0)
+          {
+            setItems(new Item[] { new StatusItem(new Status(IStatus.WARNING, P2UIPlugin.INSTANCE.getSymbolicName(),
+                "No feature items " + (filter == null ? "" : "matching '" + filter + "'") + ". Enable 'Expert mode' to see more.")) });
+          }
+          else
+          {
+            setItems(featureItems);
+          }
         }
       });
     }
@@ -1416,7 +1984,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         {
           IStructuredSelection selection = (IStructuredSelection)namespaceViewer.getSelection();
           String newNamespace = (String)selection.getFirstElement();
-          if (!ObjectUtil.equals(newNamespace, currentNamespace))
+          if (newNamespace != null && !ObjectUtil.equals(newNamespace, currentNamespace))
           {
             SETTINGS.put(CURRENT_NAMESPACE_KEY, newNamespace);
             currentNamespace = newNamespace;
@@ -1438,7 +2006,6 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       capabilitiesViewer.setContentProvider(new ItemContentProvider());
       capabilitiesViewer.setLabelProvider(new ItemLabelProvider());
       addDragSupport(capabilitiesViewer);
-
       itemsViewer = capabilitiesViewer;
     }
 
@@ -1447,10 +2014,11 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     {
       final Set<String> flavors = new HashSet<String>();
       final Set<String> namespaces = new HashSet<String>();
-      Map<String, Set<Version>> versions = new HashMap<String, Set<Version>>();
+      Map<String, Map<Version, Set<IMatchExpression<IInstallableUnit>>>> versions = new HashMap<String, Map<Version, Set<IMatchExpression<IInstallableUnit>>>>();
 
       for (IInstallableUnit iu : installableUnits)
       {
+        IMatchExpression<IInstallableUnit> filter = iu.getFilter();
         for (IProvidedCapability capability : iu.getProvidedCapabilities())
         {
           P2UIPlugin.checkCancelation(monitor);
@@ -1470,10 +2038,19 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
           if (ObjectUtil.equals(namespace, currentNamespace) && isFiltered(name))
           {
             Version version = capability.getVersion();
-            if (version != null && !Version.emptyVersion.equals(version))
+            if (version == null)
             {
-              CollectionUtil.add(versions, name, version);
+              version = Version.emptyVersion;
             }
+
+            Map<Version, Set<IMatchExpression<IInstallableUnit>>> map = versions.get(name);
+            if (map == null)
+            {
+              map = new LinkedHashMap<Version, Set<IMatchExpression<IInstallableUnit>>>();
+              versions.put(name, map);
+            }
+
+            CollectionUtil.add(map, version, filter);
           }
         }
       }
@@ -1520,7 +2097,15 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         {
           if (!container.isDisposed())
           {
-            setItems(capabilityItems);
+            if (capabilityItems.length == 0)
+            {
+              setItems(new Item[] { new StatusItem(new Status(IStatus.WARNING, P2UIPlugin.INSTANCE.getSymbolicName(),
+                  "No items " + (filter == null ? "" : "matching '" + filter + "'") + ".")) });
+            }
+            else
+            {
+              setItems(capabilityItems);
+            }
 
             namespaceViewer.setInput(namespaces);
             namespaceViewer.getCCombo().pack();
@@ -1545,36 +2130,48 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   /**
    * @author Eike Stepper
    */
-  private final class RepositoryFocusListener implements FocusListener
+  private final class RepositoryComboHandler implements FocusListener
   {
+    private static final String INITIAL_REPOSITORY_TEXT = "type repository url, drag and drop, or pick from list";
+
+    private Color initialTextForegroundColor;
+
     private Color originalForeground;
+
+    public void setActiveRepository(String activeRepository)
+    {
+      repositoryCombo.setForeground(getForegroundColor(activeRepository));
+      repositoryCombo.setText(activeRepository == null ? repositoryCombo.isFocusControl() ? "" : INITIAL_REPOSITORY_TEXT : activeRepository);
+    }
+
+    private Color getForegroundColor(String activeRepository)
+    {
+      if (originalForeground == null)
+      {
+        originalForeground = repositoryCombo.getForeground();
+      }
+
+      if (initialTextForegroundColor == null)
+      {
+        initialTextForegroundColor = formToolkit.getColors().getColor("initial_repository");
+      }
+
+      return activeRepository == null && !repositoryCombo.isFocusControl() ? initialTextForegroundColor : originalForeground;
+    }
 
     public void focusGained(FocusEvent e)
     {
-      if (originalForeground != null)
+      if (repositoryCombo.getText().equals(INITIAL_REPOSITORY_TEXT))
       {
-        repositoryCombo.setText("");
-        repositoryCombo.setForeground(originalForeground);
-        originalForeground = null;
+        setActiveRepository("");
       }
     }
 
     public void focusLost(FocusEvent e)
     {
-      String activeRepository = RepositoryManager.INSTANCE.getActiveRepository();
-      if (activeRepository == null)
+      if (StringUtil.isEmpty(repositoryCombo.getText().trim()))
       {
-        originalForeground = repositoryCombo.getForeground();
-        repositoryCombo.setText("type repository url, drag and drop, or pick from list");
-        Color color = formToolkit.getColors().getColor("initial_repository");
-        repositoryCombo.setForeground(color);
-      }
-      else
-      {
-        if (!activeRepository.equals(repositoryCombo.getText()))
-        {
-          repositoryCombo.setText(activeRepository);
-        }
+        setActiveRepository(null);
       }
     }
   }
@@ -1661,44 +2258,38 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
 
     public void repositoriesChanged(RepositoryManager repositoryManager)
     {
-      UIUtil.asyncExec(new Runnable()
+      UIUtil.asyncExec(container, new Runnable()
       {
         public void run()
         {
-          if (!container.isDisposed())
-          {
-            repositoryViewer.refresh();
+          repositoryViewer.refresh();
 
-            UIUtil.asyncExec(new Runnable()
+          UIUtil.asyncExec(container, new Runnable()
+          {
+            public void run()
             {
-              public void run()
+              String activeRepository = RepositoryManager.INSTANCE.getActiveRepository();
+              if (activeRepository == null)
               {
-                if (!container.isDisposed())
-                {
-                  String activeRepository = RepositoryManager.INSTANCE.getActiveRepository();
-                  if (activeRepository == null)
-                  {
-                    repositoryViewer.setSelection(StructuredSelection.EMPTY);
-                    repositoryCombo.setText("");
-                  }
-                  else
-                  {
-                    ISelection selection = new StructuredSelection(activeRepository);
-                    repositoryViewer.setSelection(selection);
-                    repositoryCombo.setText(activeRepository);
-                    repositoryCombo.setSelection(new Point(0, activeRepository.length()));
-                  }
-                }
+                repositoryViewer.setSelection(StructuredSelection.EMPTY);
+                repositoryComboHandler.setActiveRepository(activeRepository);
               }
-            });
-          }
+              else
+              {
+                ISelection selection = new StructuredSelection(activeRepository);
+                repositoryViewer.setSelection(selection);
+                repositoryComboHandler.setActiveRepository(activeRepository);
+                repositoryCombo.setSelection(new Point(0, activeRepository.length()));
+              }
+            }
+          });
         }
       });
     }
 
     public void activeRepositoryChanged(RepositoryManager repositoryManager, String repository)
     {
-      // Do nothing.
+      repositoryComboHandler.setActiveRepository(repository);
     }
   }
 
@@ -1824,13 +2415,13 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       if (inputElement instanceof VersionedItem)
       {
         VersionedItem versionedItem = (VersionedItem)inputElement;
-        Map<Version, IMatchExpression<IInstallableUnit>> versions = versionedItem.getVersions();
+        Map<Version, Set<IMatchExpression<IInstallableUnit>>> versions = versionedItem.getVersions();
         if (versions != null)
         {
           Set<ItemVersion> itemVersions = new HashSet<ItemVersion>();
-          for (Map.Entry<Version, IMatchExpression<IInstallableUnit>> entry : versions.entrySet())
+          for (Map.Entry<Version, Set<IMatchExpression<IInstallableUnit>>> entry : versions.entrySet())
           {
-            ItemVersion itemVersion = getItemVersion(entry.getKey(), entry.getValue());
+            ItemVersion itemVersion = getItemVersion(versionedItem, entry.getKey(), entry.getValue());
             itemVersions.add(itemVersion);
           }
 
@@ -1849,12 +2440,12 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
       return IMAGE;
     }
 
-    private ItemVersion getItemVersion(Version version, IMatchExpression<IInstallableUnit> filter)
+    private ItemVersion getItemVersion(VersionedItem item, Version version, Set<IMatchExpression<IInstallableUnit>> filters)
     {
       int segments = version.getSegmentCount();
       if (segments == 0)
       {
-        return new ItemVersion(version, "0.0.0", filter);
+        return new ItemVersion(item, version, "0.0.0", filters);
       }
 
       segments = Math.min(segments, versionSegment.ordinal() + 1);
@@ -1883,7 +2474,7 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         builder.append(".x");
       }
 
-      return new ItemVersion(version, builder.toString(), filter);
+      return new ItemVersion(item, version, builder.toString(), filters);
     }
 
     /**
@@ -1891,17 +2482,25 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
      */
     public static final class ItemVersion implements Comparable<ItemVersion>
     {
+      private final VersionedItem item;
+
       private final Version version;
 
       private final String label;
 
-      private final IMatchExpression<IInstallableUnit> filter;
+      private final Set<IMatchExpression<IInstallableUnit>> filters;
 
-      public ItemVersion(Version version, String label, IMatchExpression<IInstallableUnit> filter)
+      public ItemVersion(VersionedItem item, Version version, String label, Set<IMatchExpression<IInstallableUnit>> filters)
       {
+        this.item = item;
         this.version = version;
         this.label = label;
-        this.filter = filter;
+        this.filters = filters;
+      }
+
+      public VersionedItem getItem()
+      {
+        return item;
       }
 
       public Version getVersion()
@@ -1909,9 +2508,9 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
         return version;
       }
 
-      public IMatchExpression<IInstallableUnit> getFilter()
+      public Set<IMatchExpression<IInstallableUnit>> getFilters()
       {
-        return filter;
+        return filters;
       }
 
       public int compareTo(ItemVersion o)
@@ -2056,11 +2655,11 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   /**
    * @author Eike Stepper
    */
-  private static final class ErrorItem extends Item
+  private static final class StatusItem extends Item
   {
     private final IStatus status;
 
-    public ErrorItem(IStatus status)
+    public StatusItem(IStatus status)
     {
       this.status = status;
     }
@@ -2081,14 +2680,27 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
   /**
    * @author Eike Stepper
    */
-  private static final class CategoryItem extends Item
+  private static final class CategoryItem extends VersionedItem
   {
     private static final Image IMAGE = P2UIPlugin.INSTANCE.getSWTImage("obj16/category");
 
     private Item[] children;
 
+    private String name;
+
     public CategoryItem()
     {
+    }
+
+    public CategoryItem(String name)
+    {
+      this.name = name;
+    }
+
+    @Override
+    public String getName()
+    {
+      return name;
     }
 
     @Override
@@ -2127,18 +2739,18 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
    */
   private static abstract class VersionedItem extends Item
   {
-    private Map<Version, IMatchExpression<IInstallableUnit>> versions;
+    private Map<Version, Set<IMatchExpression<IInstallableUnit>>> versions;
 
     public VersionedItem()
     {
     }
 
-    public Map<Version, IMatchExpression<IInstallableUnit>> getVersions()
+    public Map<Version, Set<IMatchExpression<IInstallableUnit>>> getVersions()
     {
       return versions;
     }
 
-    public void setVersions(Map<Version, IMatchExpression<IInstallableUnit>> map)
+    public void setVersions(Map<Version, Set<IMatchExpression<IInstallableUnit>>> map)
     {
       versions = map;
     }
@@ -2226,17 +2838,6 @@ public class RepositoryExplorer extends ViewPart implements FilterHandler
     public void setNamespace(String namespace)
     {
       this.namespace = namespace;
-    }
-
-    public void setVersions(Set<Version> versions)
-    {
-      Map<Version, IMatchExpression<IInstallableUnit>> map = new HashMap<Version, IMatchExpression<IInstallableUnit>>();
-      for (Version version : versions)
-      {
-        map.put(version, null);
-      }
-
-      setVersions(map);
     }
 
     @Override

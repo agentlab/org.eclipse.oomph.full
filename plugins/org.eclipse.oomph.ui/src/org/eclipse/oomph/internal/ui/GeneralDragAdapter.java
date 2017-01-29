@@ -12,16 +12,26 @@ package org.eclipse.oomph.internal.ui;
 
 import org.eclipse.emf.common.command.BasicCommandStack;
 import org.eclipse.emf.common.notify.AdapterFactory;
-import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.edit.domain.EditingDomain;
 import org.eclipse.emf.edit.provider.ComposedAdapterFactory;
+import org.eclipse.emf.edit.ui.action.CopyAction;
 
+import org.eclipse.jface.action.IMenuListener;
+import org.eclipse.jface.action.IMenuManager;
+import org.eclipse.jface.action.MenuManager;
+import org.eclipse.jface.action.Separator;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.ISelectionProvider;
+import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.Viewer;
+import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Menu;
+import org.eclipse.ui.ISharedImages;
+import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.actions.ActionFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -31,16 +41,71 @@ import java.util.List;
  */
 public final class GeneralDragAdapter extends OomphDragAdapter
 {
-  public GeneralDragAdapter(Viewer viewer, DraggedObjectsFactory factory)
+  private CopyAction copyAction;
+
+  private MenuManager contextMenu;
+
+  public GeneralDragAdapter(Viewer viewer, DraggedObjectsFactory factory, List<? extends OomphTransferDelegate> delegates)
   {
-    super(createEditingDomain(), createSelectionProvider(viewer, factory), OomphTransferDelegate.DELEGATES);
+    super(createEditingDomain(delegates), createSelectionProvider(viewer, factory), delegates);
+    createContextMenu(viewer.getControl());
   }
 
-  private static EditingDomain createEditingDomain()
+  public EditingDomain getEditingDomain()
+  {
+    return domain;
+  }
+
+  public CopyAction getCopyAction()
+  {
+    return copyAction;
+  }
+
+  public MenuManager getContextMenu()
+  {
+    return contextMenu;
+  }
+
+  private void createContextMenu(Control control)
+  {
+    copyAction = new CopyAction(domain);
+    copyAction.setId(ActionFactory.COPY.getId());
+
+    try
+    {
+      ISharedImages sharedImages = PlatformUI.getWorkbench().getSharedImages();
+      copyAction.setImageDescriptor(sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_COPY));
+    }
+    catch (RuntimeException ex)
+    {
+      // Ignore it if we can't set an image.
+    }
+
+    contextMenu = new MenuManager("#PopUp");
+
+    contextMenu.add(new Separator("additions"));
+    contextMenu.setRemoveAllWhenShown(true);
+    contextMenu.addMenuListener(new IMenuListener()
+    {
+      public void menuAboutToShow(IMenuManager manager)
+      {
+        IStructuredSelection selection = (IStructuredSelection)selectionProvider.getSelection();
+        copyAction.setEnabled(copyAction.updateSelection(selection));
+        if (copyAction.isEnabled())
+        {
+          manager.add(copyAction);
+        }
+      }
+    });
+
+    Menu menu = contextMenu.createContextMenu(control);
+    control.setMenu(menu);
+  }
+
+  private static EditingDomain createEditingDomain(List<? extends OomphTransferDelegate> delegates)
   {
     AdapterFactory adapterFactory = new ComposedAdapterFactory(ComposedAdapterFactory.Descriptor.Registry.INSTANCE);
-    EditingDomain editingDomain = new OomphEditingDomain(adapterFactory, new BasicCommandStack(), new HashMap<Resource, Boolean>(),
-        OomphTransferDelegate.DELEGATES);
+    EditingDomain editingDomain = new OomphEditingDomain(adapterFactory, new BasicCommandStack(), new HashMap<Resource, Boolean>(), delegates);
     return editingDomain;
   }
 
@@ -54,7 +119,7 @@ public final class GeneralDragAdapter extends OomphDragAdapter
 
         try
         {
-          List<EObject> objects = factory.createDraggedObjects(selection);
+          List<Object> objects = factory.createDraggedObjects(selection);
           if (objects != null && !objects.isEmpty())
           {
             return new StructuredSelection(objects);
@@ -65,7 +130,7 @@ public final class GeneralDragAdapter extends OomphDragAdapter
           UIPlugin.INSTANCE.log(ex);
         }
 
-        return new StructuredSelection(new Object());
+        return StructuredSelection.EMPTY;
       }
 
       public void setSelection(ISelection selection)
@@ -90,6 +155,6 @@ public final class GeneralDragAdapter extends OomphDragAdapter
    */
   public interface DraggedObjectsFactory
   {
-    public List<EObject> createDraggedObjects(ISelection selection) throws Exception;
+    public List<Object> createDraggedObjects(ISelection selection) throws Exception;
   }
 }

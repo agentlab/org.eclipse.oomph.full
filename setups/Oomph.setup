@@ -73,8 +73,6 @@
     <repository
         url="http://download.eclipse.org/egit/updates-stable-nightly"/>
     <repository
-        url="http://download.eclipse.org/mylyn/snapshots/3.19"/>
-    <repository
         url="http://download.eclipse.org/technology/swtbot/snapshots"/>
     <repository
         url="${oomph.update.url}"/>
@@ -161,7 +159,7 @@
     <setupTask
         xsi:type="setup:VariableTask"
         name="eclipse.target.platform"
-        defaultValue="Mars"
+        defaultValue="Neon"
         storageURI="scope://Workspace"
         label="Target Platform">
       <description>Choose the compatibility level of the target platform</description>
@@ -277,38 +275,30 @@
           <repository
               url="http://download.eclipse.org/modeling/emf/cdo/orbit/latest-R"/>
           <repository
-              url="http://download.eclipse.org/modeling/emf/emf/updates/2.11"/>
+              url="http://download.eclipse.org/modeling/emf/emf/updates/2.13milestones"/>
           <repository
-              url="http://download.eclipse.org/mylyn/snapshots/3.19"/>
+              url="http://download.eclipse.org/mylyn/snapshots/3.22"/>
           <repository
-              url="http://download.eclipse.org/technology/m2e/releases/1.6"/>
+              url="http://download.eclipse.org/technology/m2e/snapshots/1.8.0/latest"/>
           <repository
               url="http://download.eclipse.org/technology/nebula/snapshot"/>
           <repository
               url="http://download.eclipse.org/technology/swtbot/snapshots"/>
           <repository
-              url="http://download.eclipse.org/webtools/downloads/drops/R3.7.0/R-3.7.0-20150609111814/repository"/>
+              url="http://download.eclipse.org/webtools/repository/oxygen"/>
         </repositoryList>
         <repositoryList
             name="Neon">
           <repository
-              url="http://download.eclipse.org/oomph/uss/updates/latest"/>
-          <repository
-              url="http://download.eclipse.org/egit/updates"/>
-          <repository
-              url="http://download.eclipse.org/modeling/emf/cdo/orbit/latest-R"/>
-          <repository
-              url="http://download.eclipse.org/modeling/emf/emf/updates/2.11"/>
-          <repository
-              url="http://download.eclipse.org/mylyn/snapshots/3.19"/>
-          <repository
-              url="http://download.eclipse.org/technology/m2e/releases/1.6"/>
+              url="http://download.eclipse.org/releases/neon"/>
           <repository
               url="http://download.eclipse.org/technology/nebula/snapshot"/>
           <repository
-              url="http://download.eclipse.org/technology/swtbot/snapshots"/>
+              url="http://download.eclipse.org/technology/swtbot/releases/latest"/>
           <repository
-              url="http://download.eclipse.org/webtools/downloads/drops/R3.7.0/R-3.7.0-20150609111814/repository"/>
+              url="http://download.eclipse.org/modeling/emf/cdo/orbit/latest-R"/>
+          <repository
+              url="http://download.eclipse.org/oomph/uss/updates/latest"/>
         </repositoryList>
         <repositoryList
             name="Mars">
@@ -527,6 +517,9 @@
           summary="Oomph Resolved in 1.6.0"
           url="https://bugs.eclipse.org/bugs/buglist.cgi?product=Oomph&amp;bug_status=RESOLVED&amp;bug_status=VERIFIED&amp;bug_status=CLOSED&amp;resolution=FIXED&amp;resolution=DUPLICATE&amp;version=1.6.0"/>
       <query
+          summary="Oomph Resolved in 1.7.0"
+          url="https://bugs.eclipse.org/bugs/buglist.cgi?product=Oomph&amp;bug_status=RESOLVED&amp;bug_status=VERIFIED&amp;bug_status=CLOSED&amp;resolution=FIXED&amp;resolution=DUPLICATE&amp;version=1.7.0"/>
+      <query
           summary="Oomph Unspecified Version"
           url="https://bugs.eclipse.org/bugs/buglist.cgi?product=Oomph&amp;version=unspecified"/>
     </setupTask>
@@ -566,6 +559,6 @@
   </stream>
   <logicalProjectContainer
       xsi:type="setup:ProjectCatalog"
-      href="index:/org.eclipse.setup#//@projectCatalogs[name='org.eclipse']"/>
+      href="org.eclipse.setup#//@projectCatalogs[name='org.eclipse']"/>
   <description>The Oomph project provides tools and frameworks to enhance the installation and usage of Eclipse.</description>
 </setup:Project>

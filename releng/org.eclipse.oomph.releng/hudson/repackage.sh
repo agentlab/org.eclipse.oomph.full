@@ -65,6 +65,16 @@ for f in *.zip; do
       zip -r -q unsigned.zip "Eclipse Installer.app"
       rm -rf "Eclipse Installer.app"
       curl -o signed.zip -F file=@unsigned.zip http://build.eclipse.org:31338/macsign.php
+      
+      actualSize=$(wc -c signed.zip | cut -f 1 -d ' ')
+      if [ $actualSize -lt 40000000 ]; then
+        echo "signed.zip is just $actualSize bytes large!"
+        echo ""
+        cat signed.zip
+        echo ""
+        exit 1
+      fi
+      
       unzip -qq signed.zip
       rm -f unsigned.zip signed.zip
     fi
@@ -79,6 +89,15 @@ for f in *.zip; do
       echo "  Signing eclipse-inst.exe"
       curl -o signed.exe -F filedata=@eclipse-inst.exe http://build.eclipse.org:31338/winsign.php
       mv signed.exe eclipse-inst.exe
+
+      actualSize=$(wc -c eclipse-inst.exe | cut -f 1 -d ' ')
+      if [ $actualSize -lt 200000 ]; then
+        echo "eclipse-inst.exe is just $actualSize bytes large!"
+        echo ""
+        cat eclipse-inst.exe
+        echo ""
+        exit 1
+      fi
     fi
 
     zip -r -9 -qq --symlinks $PRODUCTS/$f *
@@ -110,6 +129,9 @@ for f in *.zip; do
       actualSize=$(wc -c "$PRODUCTS/$extractor" | cut -f 1 -d ' ')
       if [ $actualSize -lt 40000000 ]; then
         echo "$PRODUCTS/$extractor is just $actualSize bytes large!"
+        echo ""
+        cat "$PRODUCTS/$extractor"
+        echo ""
         exit 1
       fi
     fi
