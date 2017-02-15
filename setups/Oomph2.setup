@@ -291,6 +291,8 @@
           <repository
               url="http://download.eclipse.org/releases/neon"/>
           <repository
+              url="http://download.eclipse.org/eclipse/updates/4.6"/>
+          <repository
               url="http://download.eclipse.org/technology/nebula/snapshot"/>
           <repository
               url="http://download.eclipse.org/technology/swtbot/releases/latest"/>
@@ -298,6 +300,8 @@
               url="http://download.eclipse.org/modeling/emf/cdo/orbit/latest-R"/>
           <repository
               url="http://download.eclipse.org/oomph/uss/updates/latest"/>
+          <repository
+              url="http://download.eclipse.org/oomph/updates/milestone/latest"/>
         </repositoryList>
         <repositoryList
             name="Mars">
