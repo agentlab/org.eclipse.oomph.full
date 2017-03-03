@@ -208,28 +208,6 @@
           </detail>
         </annotation>
         <annotation
-            source="http:/www.eclipse.org/oomph/targlets/PomModulesUpdater">
-          <detail
-              key="location">
-            <value>${git.clone.oomph.location/releng/org.eclipse.oomph.parent/plugins/pom.xml}</value>
-          </detail>
-          <detail
-              key="moduleRoots">
-            <value>${git.clone.oomph.location/plugins}</value>
-          </detail>
-        </annotation>
-        <annotation
-            source="http:/www.eclipse.org/oomph/targlets/PomModulesUpdater">
-          <detail
-              key="location">
-            <value>${git.clone.oomph.location/releng/org.eclipse.oomph.parent/features/pom.xml}</value>
-          </detail>
-          <detail
-              key="moduleRoots">
-            <value>${git.clone.oomph.location/features}</value>
-          </detail>
-        </annotation>
-        <annotation
             source="http:/www.eclipse.org/oomph/targlets/TargetDefinitionGenerator">
           <detail
               key="location">
